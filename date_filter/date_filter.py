@@ -19,23 +19,24 @@ class DateFilter:
 
     def filter(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.in_queue.cancel()
-
         match = body.decode().split(',')
+        if match[1] == END:
+            self.out_queue.publish(body)
+            return
+
         date_from = match[0]
         date_to = match[1]
         tourney_date = match[5]
         if tourney_date < date_from or tourney_date > date_to:
             return
-        data = ','.join(match[3:]) # Change to 2
+        data = ','.join(match[2:])
         self.out_queue.publish(data)
         logging.info('Sent %s' % data)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.ERROR)
 
     filter = DateFilter()
     filter.run()

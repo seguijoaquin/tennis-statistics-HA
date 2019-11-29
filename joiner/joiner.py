@@ -34,19 +34,22 @@ class Joiner:
 
     def join(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.terminator_queue.publish(END)
-            return
-
-        if body == CLOSE_ENCODED:
-            self.terminator_queue.publish(OK)
-            self.matches_queue.cancel()
-            return
-
         data = body.decode().split(',')
-        winner_id = data[4]
-        loser_id = data[5]
-        data = [data[2]] + self.players[winner_id] + self.players[loser_id]
+
+        if data[1] == END:
+            self.terminator_queue.publish(body)
+            logging.info('Sent %r' % body)
+            return
+
+        if data[1] == CLOSE:
+            body = ','.join([data[0], OK])
+            self.terminator_queue.publish(body)
+            logging.info('Sent %s' % body)
+            return
+
+        winner_id = data[5]
+        loser_id = data[6]
+        data = [data[0], data[3]] + self.players[winner_id] + self.players[loser_id]
         body = ','.join(data)
         self.out_queue.publish(body)
         logging.info('Sent %s' % body)

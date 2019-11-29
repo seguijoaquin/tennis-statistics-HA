@@ -22,24 +22,29 @@ class SurfaceDispatcher:
 
     def dispatch(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.terminator_queue.publish(END)
-            return
-
-        if body == CLOSE_ENCODED:
-            self.terminator_queue.publish(OK)
-            self.in_queue.cancel()
-            return
-
         data = body.decode().split(',')
-        surface = data[3]
-        minutes = data[9]
+
+        if data[1] == END:
+            self.terminator_queue.publish(body)
+            logging.info('Sent %r' % body)
+            return
+
+        if data[1] == CLOSE:
+            body = ','.join([data[0], OK])
+            self.terminator_queue.publish(body)
+            logging.info('Sent %s' % body)
+            return
+
+        id = data[0]
+        surface = data[4]
+        minutes = data[10]
 
         if minutes == '' or surface in ('', 'None'):
             return
 
-        self.out_queue.publish(minutes, surface)
-        logging.info('Sent %s minutes to %s accumulator' % (minutes, surface))
+        body = ','.join([id, minutes])
+        self.out_queue.publish(body, surface)
+        logging.info('Sent %s to %s accumulator' % (body, surface))
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

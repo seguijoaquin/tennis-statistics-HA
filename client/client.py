@@ -7,9 +7,12 @@ from rabbitmq_queue import RabbitMQQueue
 
 PLAYERS_DATA = './data/atp_players.csv'
 MATCHES_DATA = './data/atp_matches_*.csv'
+FROM_DEFAULT = '20000101'
+TO_DEFAULT = '20200101'
 
 class Client:
     def __init__(self, argv):
+        self.metadata = [FROM_DEFAULT, TO_DEFAULT, None]
         self.parse_args(argv)
         self.results = 0
         self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE, consumer=True,
@@ -26,13 +29,15 @@ class Client:
 
         for option, arg in options:
             if option in ("-u", "--user"):
-                id = arg
+                self.metadata[2] = arg
             elif option in ("-f", "--from"):
-                date_from = arg
+                self.metadata[0] = arg
             else:
-                date_to = arg
+                self.metadata[1] = arg
 
-        self.metadata = [date_from, date_to, id]
+        if self.metadata[2] is None:
+            print("Usage: python3 client.py --user=id [--from=YYYYMMDD] [--to=YYYYMMDD]")
+            sys.exit(2)
 
     def run(self):
         self.send_players_data()
@@ -57,7 +62,8 @@ class Client:
                     self.matches_queue.publish(body)
                     logging.info('Sent %s' % body)
 
-        self.matches_queue.publish(END)
+        end = ','.join([self.metadata[2], END])
+        self.matches_queue.publish(end)
 
     def print_response(self, ch, method, properties, body):
         print(body.decode())
@@ -68,6 +74,6 @@ class Client:
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.ERROR)
     client = Client(sys.argv[1:])
     client.run()
