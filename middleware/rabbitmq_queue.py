@@ -10,7 +10,7 @@ class RabbitMQQueue:
         self.channel = connection.channel()
 
         self.exchange = exchange
-        self.channel.exchange_declare(exchange=exchange, exchange_type=exchange_type)
+        self.channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
         if not consumer:
             return
 
