@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import logging
+import logging, sys, getopt
 from glob import glob
 from constants import END, RESPONSE_EXCHANGE, PLAYERS_EXCHANGE, MATCHES_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
@@ -9,12 +9,30 @@ PLAYERS_DATA = './data/atp_players.csv'
 MATCHES_DATA = './data/atp_matches_*.csv'
 
 class Client:
-    def __init__(self):
+    def __init__(self, argv):
+        self.parse_args(argv)
         self.results = 0
         self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE, consumer=True,
                                       exclusive=True)
         self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE)
         self.matches_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE)
+
+    def parse_args(self, argv):
+        try:
+            options, args = getopt.getopt(argv,"u:f:t:",["user=", "from=", "to="])
+        except getopt.GetoptError:
+            print("Usage: python3 client.py --user=id [--from=YYYYMMDD] [--to=YYYYMMDD]")
+            sys.exit(2)
+
+        for option, arg in options:
+            if option in ("-u", "--user"):
+                id = arg
+            elif option in ("-f", "--from"):
+                date_from = arg
+            else:
+                date_to = arg
+
+        self.metadata = [date_from, date_to, id]
 
     def run(self):
         self.send_players_data()
@@ -35,8 +53,9 @@ class Client:
             with open(filename, 'r') as file:
                 file.readline()
                 for line in iter(file.readline, ''):
-                    self.matches_queue.publish(line)
-                    logging.info('Sent %s' % line)
+                    body = ','.join(self.metadata) + ',' + line
+                    self.matches_queue.publish(body)
+                    logging.info('Sent %s' % body)
 
         self.matches_queue.publish(END)
 
@@ -49,6 +68,6 @@ class Client:
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.ERROR)
-    client = Client()
+                        level=logging.INFO)
+    client = Client(sys.argv[1:])
     client.run()

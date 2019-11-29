@@ -218,11 +218,19 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  date_filter:
+    build:
+      context: .
+      dockerfile: date_filter/Dockerfile
+    command: python3 -u ./date_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   client:
     build:
       context: .
       dockerfile: client/Dockerfile
-    command: python3 -u ./client.py
     depends_on:
       rabbitmq:
         condition: service_healthy
