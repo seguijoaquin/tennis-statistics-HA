@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import logging
-from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, FILTERED_EXCHANGE, PLAYERS_EXCHANGE
+from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, JOINER_EXCHANGE, PLAYERS_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
 END_ENCODED = END.encode()
 CLOSE_ENCODED = CLOSE.encode()
-FILTERED_QUEUE = 'matches_join'
+JOINER_QUEUE = 'matches_join'
 TERMINATOR_EXCHANGE = 'joiner_terminator'
 
 class Joiner:
@@ -14,8 +14,8 @@ class Joiner:
         self.players = {}
         self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE, consumer=True,
                                            exclusive=True)
-        self.matches_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, consumer=True,
-                                           queue_name=FILTERED_QUEUE)
+        self.matches_queue = RabbitMQQueue(exchange=JOINER_EXCHANGE, consumer=True,
+                                           queue_name=JOINER_QUEUE)
         self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE)
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 

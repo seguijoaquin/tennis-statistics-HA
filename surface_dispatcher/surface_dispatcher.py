@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
 import logging
-from constants import END, CLOSE, OK, FILTERED_EXCHANGE
+from constants import END, CLOSE, OK, DISPATCHER_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
 SURFACES = ['Hard', 'Clay', 'Carpet', 'Grass']
 END_ENCODED = END.encode()
 CLOSE_ENCODED = CLOSE.encode()
 SURFACE_EXCHANGE = 'surfaces'
-FILTERED_QUEUE = 'matches_surface'
+DISPATCHER_QUEUE = 'matches_surface'
 TERMINATOR_EXCHANGE = 'dispatcher_terminator'
 
 class SurfaceDispatcher:
     def __init__(self):
-        self.in_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, consumer=True, queue_name=FILTERED_QUEUE)
+        self.in_queue = RabbitMQQueue(exchange=DISPATCHER_EXCHANGE, consumer=True, queue_name=DISPATCHER_QUEUE)
         self.out_queue = RabbitMQQueue(exchange=SURFACE_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 

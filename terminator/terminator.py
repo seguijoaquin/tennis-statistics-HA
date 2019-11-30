@@ -22,7 +22,8 @@ class Terminator:
         self.in_queue.consume(self.close)
 
     def close(self, ch, method, properties, body):
-        data = body.decode().split()
+        logging.info('Received %r' % body)
+        data = body.decode().split(',')
         if data[1] == END:
             for i in range(self.processes_number):
                 body = ','.join([data[0], CLOSE])

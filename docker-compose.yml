@@ -26,7 +26,7 @@ services:
     environment:
       PROCESSES_NUMBER: ${SURFACE_DISPATCHERS_NUMBER}
       IN_EXCHANGE: dispatcher_terminator
-      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE: filtered_dispatcher
       NEXT_EXCHANGE: surfaces
       NEXT_EXCHANGE_TYPE: direct
       NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
@@ -99,7 +99,7 @@ services:
     environment:
       PROCESSES_NUMBER: ${JOINERS_NUMBER}
       IN_EXCHANGE: joiner_terminator
-      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE: filtered_joiner
       NEXT_EXCHANGE: joined
       NEXT_EXCHANGE_TYPE: fanout
       NEXT_ROUTING_KEYS: ''
