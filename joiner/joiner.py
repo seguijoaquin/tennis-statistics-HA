@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import logging
-from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, JOINER_EXCHANGE, PLAYERS_EXCHANGE
+from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, FILTERED_EXCHANGE, PLAYERS_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
 END_ENCODED = END.encode()
 CLOSE_ENCODED = CLOSE.encode()
-JOINER_QUEUE = 'matches_join'
+FILTERED_QUEUE = 'matches_join'
 TERMINATOR_EXCHANGE = 'joiner_terminator'
 
 class Joiner:
@@ -14,9 +14,10 @@ class Joiner:
         self.players = {}
         self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE, consumer=True,
                                            exclusive=True)
-        self.matches_queue = RabbitMQQueue(exchange=JOINER_EXCHANGE, consumer=True,
-                                           queue_name=JOINER_QUEUE)
-        self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE)
+        self.matches_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct',
+                                           consumer=True, queue_name=FILTERED_QUEUE,
+                                           routing_keys=['joiner'])
+        self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
     def run(self):
@@ -51,7 +52,8 @@ class Joiner:
         loser_id = data[6]
         data = [data[0], data[3]] + self.players[winner_id] + self.players[loser_id]
         body = ','.join(data)
-        self.out_queue.publish(body)
+        self.out_queue.publish(body, 'filter')
+        self.out_queue.publish(body, 'calculator')
         logging.info('Sent %s' % body)
 
 if __name__ == '__main__':

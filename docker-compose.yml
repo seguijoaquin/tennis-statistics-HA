@@ -26,7 +26,9 @@ services:
     environment:
       PROCESSES_NUMBER: ${SURFACE_DISPATCHERS_NUMBER}
       IN_EXCHANGE: dispatcher_terminator
-      GROUP_EXCHANGE: filtered_dispatcher
+      GROUP_EXCHANGE: filtered
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: dispatcher
       NEXT_EXCHANGE: surfaces
       NEXT_EXCHANGE_TYPE: direct
       NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
@@ -99,10 +101,12 @@ services:
     environment:
       PROCESSES_NUMBER: ${JOINERS_NUMBER}
       IN_EXCHANGE: joiner_terminator
-      GROUP_EXCHANGE: filtered_joiner
+      GROUP_EXCHANGE: filtered
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: joiner
       NEXT_EXCHANGE: joined
-      NEXT_EXCHANGE_TYPE: fanout
-      NEXT_ROUTING_KEYS: ''
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: filter-calculator
     command: python3 -u ./terminator.py
     depends_on:
       rabbitmq:
@@ -125,6 +129,8 @@ services:
       PROCESSES_NUMBER: ${AGE_CALCULATORS_NUMBER}
       IN_EXCHANGE: calculator_terminator
       GROUP_EXCHANGE: joined
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: calculator
       NEXT_EXCHANGE: player_age
       NEXT_EXCHANGE_TYPE: fanout
       NEXT_ROUTING_KEYS: ''
@@ -150,6 +156,8 @@ services:
       PROCESSES_NUMBER: ${AGE_DIFFERENCE_FILTERS_NUMBER}
       IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
+      GROUP_EXCHANGE_TYPE: fanout
+      GROUP_ROUTING_KEY: ''
       NEXT_EXCHANGE: database
       NEXT_EXCHANGE_TYPE: direct
       NEXT_ROUTING_KEYS: age
@@ -175,6 +183,8 @@ services:
       PROCESSES_NUMBER: ${DIFFERENT_HANDS_FILTERS_NUMBER}
       IN_EXCHANGE: hands_filter_terminator
       GROUP_EXCHANGE: joined
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: filter
       NEXT_EXCHANGE: hands
       NEXT_EXCHANGE_TYPE: direct
       NEXT_ROUTING_KEYS: R-L-U

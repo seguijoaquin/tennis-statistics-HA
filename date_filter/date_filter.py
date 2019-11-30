@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from constants import END, CLOSE, OK, MATCHES_EXCHANGE, JOINER_EXCHANGE, DISPATCHER_EXCHANGE
+from constants import END, CLOSE, OK, MATCHES_EXCHANGE, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
 END_ENCODED = END.encode()
@@ -12,8 +12,7 @@ class DateFilter:
     def __init__(self):
         self.in_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE, consumer=True,
                                       queue_name=MATCHES_QUEUE)
-        self.joiner_queue = RabbitMQQueue(exchange=JOINER_EXCHANGE)
-        self.dispatcher_queue = RabbitMQQueue(exchange=DISPATCHER_EXCHANGE)
+        self.out_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct')
 
     def run(self):
         self.in_queue.consume(self.filter)
@@ -22,8 +21,8 @@ class DateFilter:
         logging.info('Received %r' % body)
         match = body.decode().split(',')
         if match[1] == END:
-            self.joiner_queue.publish(body)
-            self.dispatcher_queue.publish(body)
+            self.out_queue.publish(body, 'joiner')
+            self.out_queue.publish(body, 'dispatcher')
             logging.info('Sent %r' % body)
             return
 
@@ -33,8 +32,8 @@ class DateFilter:
         if tourney_date < date_from or tourney_date > date_to:
             return
         data = ','.join(match[2:])
-        self.joiner_queue.publish(data)
-        self.dispatcher_queue.publish(data)
+        self.out_queue.publish(data, 'joiner')
+        self.out_queue.publish(data, 'dispatcher')
         logging.info('Sent %s' % data)
 
 if __name__ == '__main__':

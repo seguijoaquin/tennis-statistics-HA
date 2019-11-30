@@ -5,8 +5,6 @@ import logging
 from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
-END_ENCODED = END.encode()
-CLOSE_ENCODED = CLOSE.encode()
 JOINED_QUEUE = 'joined_hands'
 HANDS_EXCHANGE = 'hands'
 TERMINATOR_EXCHANGE = 'hands_filter_terminator'
@@ -14,8 +12,9 @@ HANDS = ['R', 'L', 'U']
 
 class DifferentHandsFilter:
     def __init__(self):
-        self.in_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, consumer=True,
-                                      queue_name=JOINED_QUEUE)
+        self.in_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, exchange_type='direct',
+                                      consumer=True, queue_name=JOINED_QUEUE,
+                                      routing_keys=['filter'])
         self.out_queue = RabbitMQQueue(exchange=HANDS_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
@@ -24,21 +23,26 @@ class DifferentHandsFilter:
 
     def filter(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.terminator_queue.publish(END)
-            return
-
-        if body == CLOSE_ENCODED:
-            self.terminator_queue.publish(OK)
-            self.in_queue.cancel()
-            return
-
         data = body.decode().split(',')
-        winner_hand = data[3]
-        loser_hand = data[7]
+        id = data[0]
+
+        if data[1] == END:
+            self.terminator_queue.publish(body)
+            logging.info('Sent %r' % body)
+            return
+
+        if data[1] == CLOSE:
+            body = ','.join([data[0], OK])
+            self.terminator_queue.publish(body)
+            logging.info('Sent %s' % body)
+            return
+
+        winner_hand = data[4]
+        loser_hand = data[8]
         if winner_hand in HANDS and loser_hand != winner_hand:
-            self.out_queue.publish('1', winner_hand)
-            logging.info('Sent 1 to %s accumulator' % winner_hand)
+            body = ','.join([id, '1'])
+            self.out_queue.publish(body, winner_hand)
+            logging.info('Sent %s to %s accumulator' % (body, winner_hand))
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
