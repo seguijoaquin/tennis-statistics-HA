@@ -28,7 +28,7 @@ class Database:
                 return
 
             for filename in FILES:
-                file = open(filename, 'r')
+                file = open(filename + id, 'r')
                 response = file.read()
                 file.close()
                 out_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + id)
@@ -36,7 +36,7 @@ class Database:
                 logging.info('Sent %s' % response)
             return
 
-        file = open(method.routing_key, 'a+')
+        file = open(method.routing_key + id, 'a+')
         file.write(result + '\n')
         file.close()
 
