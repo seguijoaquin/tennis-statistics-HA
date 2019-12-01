@@ -12,8 +12,7 @@ HANDS_EXCHANGE = 'hands_values'
 
 class PercentageCalculator:
     def __init__(self):
-        self.left = None
-        self.right = None
+        self.hands = {}
         self.in_queue = RabbitMQQueue(exchange=HANDS_EXCHANGE, consumer=True, exclusive=True)
         self.out_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct')
 
@@ -22,25 +21,36 @@ class PercentageCalculator:
 
     def calculate(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        [hand, amount, total] = body.decode().split(',')
+        [id, hand, amount, total] = body.decode().split(',')
+        if not id in self.hands:
+            self.hands[id] = [None, None]
+
+        left = self.hands[id][1]
         if hand == RIGHT:
-            self.right = float(amount)
-            if self.left is None:
+            self.hands[id][0] = float(amount)
+            if self.hands[id][1] is None:
                 return
 
         if hand == NO_RIGHT:
-            self.left = float(amount)
-            if self.right is None:
+            self.hands[id][1] = float(amount)
+            if self.hands[id][0] is None:
                 return
 
-        right_percentage = 100 * self.right / (self.left + self.right)
+        right_percentage = 100 * self.hands[id][0] / (self.hands[id][0] + self.hands[id][1])
         left_percentage = 100 - right_percentage
         right_response = 'R Victories: {}%'.format(right_percentage)
         left_response = 'L Victories: {}%'.format(left_percentage)
-        self.out_queue.publish(right_response, ROUTING_KEY)
-        self.out_queue.publish(left_response, ROUTING_KEY)
-        self.out_queue.publish(END, ROUTING_KEY)
-        self.in_queue.cancel()
+
+        body = ','.join([id, right_response])
+        self.out_queue.publish(body, ROUTING_KEY)
+        logging.info('Sent %s' % body)
+
+        body = ','.join([id, left_response])
+        self.out_queue.publish(body, ROUTING_KEY)
+        logging.info('Sent %s' % body)
+
+        body = ','.join([id, END])
+        self.out_queue.publish(body, ROUTING_KEY)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

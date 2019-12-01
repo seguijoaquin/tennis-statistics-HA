@@ -31,7 +31,7 @@ services:
       GROUP_ROUTING_KEY: dispatcher
       NEXT_EXCHANGE: surfaces
       NEXT_EXCHANGE_TYPE: direct
-      NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
+      NEXT_ROUTING_KEYS: Hard-Clay-Grass
     command: python3 -u ./terminator.py
     depends_on:
       rabbitmq:
@@ -187,7 +187,7 @@ services:
       GROUP_ROUTING_KEY: filter
       NEXT_EXCHANGE: hands
       NEXT_EXCHANGE_TYPE: direct
-      NEXT_ROUTING_KEYS: R-L-U
+      NEXT_ROUTING_KEYS: R-L
     command: python3 -u ./terminator.py
     depends_on:
       rabbitmq:
@@ -233,6 +233,24 @@ services:
       context: .
       dockerfile: date_filter/Dockerfile
     command: python3 -u ./date_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  date_filter_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${DATE_FILTERS_NUMBER}
+      IN_EXCHANGE: date_filter_terminator
+      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE_TYPE: fanout
+      GROUP_ROUTING_KEY: ''
+      NEXT_EXCHANGE: filtered
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: dispatcher-joiner
+    command: python3 -u ./terminator.py
     depends_on:
       rabbitmq:
         condition: service_healthy

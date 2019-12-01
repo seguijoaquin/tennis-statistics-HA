@@ -7,12 +7,14 @@ from rabbitmq_queue import RabbitMQQueue
 END_ENCODED = END.encode()
 CLOSE_ENCODED = CLOSE.encode()
 MATCHES_QUEUE = 'matches_queue'
+TERMINATOR_EXCHANGE = 'date_filter_terminator'
 
 class DateFilter:
     def __init__(self):
         self.in_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE, consumer=True,
                                       queue_name=MATCHES_QUEUE)
         self.out_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct')
+        self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
     def run(self):
         self.in_queue.consume(self.filter)
@@ -21,9 +23,14 @@ class DateFilter:
         logging.info('Received %r' % body)
         match = body.decode().split(',')
         if match[1] == END:
-            self.out_queue.publish(body, 'joiner')
-            self.out_queue.publish(body, 'dispatcher')
+            self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            return
+
+        if match[1] == CLOSE:
+            body = ','.join([match[0], OK])
+            self.terminator_queue.publish(body)
+            logging.info('Sent %s' % body)
             return
 
         date_from = match[0]

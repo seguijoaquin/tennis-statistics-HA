@@ -8,29 +8,32 @@ FILES = ['surface', 'hand', 'age']
 
 class Database:
     def __init__(self):
-        self.count = 0
+        self.count = {}
         self.in_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct',
                                       consumer=True, exclusive=True, routing_keys=FILES)
-        self.out_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE)
 
     def run(self):
         self.in_queue.consume(self.persist)
 
     def persist(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        result = body.decode()
-        if result == END:
-            self.count += 1
+        data = body.decode().split(',')
+        id = data[0]
+        result = data[1]
 
-            if self.count != 3:
+        if result == END:
+            self.count[id] = self.count.get(id, 0) + 1
+
+            if self.count[id] != 3:
                 return
 
             for filename in FILES:
                 file = open(filename, 'r')
                 response = file.read()
                 file.close()
-                self.out_queue.publish(response)
-                self.in_queue.cancel()
+                out_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + id)
+                out_queue.publish(response)
+                logging.info('Sent %s' % response)
             return
 
         file = open(method.routing_key, 'a+')
@@ -40,6 +43,6 @@ class Database:
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.ERROR)
+                        level=logging.INFO)
     database = Database()
     database.run()

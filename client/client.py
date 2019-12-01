@@ -15,8 +15,8 @@ class Client:
         self.metadata = [FROM_DEFAULT, TO_DEFAULT, None]
         self.parse_args(argv)
         self.results = 0
-        self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE, consumer=True,
-                                      exclusive=True)
+        self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + self.metadata[2],
+                                      consumer=True, exclusive=True)
         self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE)
         self.matches_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE)
 
