@@ -26,11 +26,14 @@ class HeartbeatProcess:
         Receives this object as argument. Useful for altering metadata
         during runtime."""
     def __init__(self, hostname, metadata, callback):
-        logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname))
-        # set up thread sending heartbeats
+        logging.basicConfig(format='%(asctime)s %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.ERROR)
+        logging.info("Instancing heartbeat process for hostname {}".format(hostname))
         self.hostname = hostname
         self.metadata = metadata
         self.callback = callback
+        logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname))
         self.exchange = RabbitMQQueue(
             exchange=watchdog.EXCHANGE,
             consumer=False, exchange_type="fanout")
@@ -38,13 +41,15 @@ class HeartbeatProcess:
     def start_heartbeat_thread(self):
         logging.info("Starting heartbeat thread..")
         self.thread = threading.Thread(target=self.periodic_heartbeat)
-
+        self.thread.start()
     def periodic_heartbeat(self):
         while True:
+            logging.info("Sending hearbeat")
             self.exchange.publish("heartbeat,{},{}".format(self.hostname, self.metadata))
             time.sleep(HEARTBEAT_INTERVAL)
 
     def run(self):
         """Starts the thread and runs the callback"""
+        logging.info("Starting thread and running the callback")
         self.start_heartbeat_thread()
         self.callback(self)
