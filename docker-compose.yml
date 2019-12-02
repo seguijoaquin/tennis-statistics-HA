@@ -238,3 +238,36 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  watchdog_1:
+    build:
+      context: .
+      dockerfile: leader/Dockerfile
+    command: python3 -u ./leader.py
+    environment:
+      PID: 1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  watchdog_2:
+    build:
+      context: .
+      dockerfile: leader/Dockerfile
+    command: python3 -u ./leader.py
+    environment:
+      PID: 2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  watchdog_3:
+    build:
+      context: .
+      dockerfile: leader/Dockerfile
+    command: python3 -u ./leader.py
+    environment:
+      PID: 3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
