@@ -10,7 +10,9 @@ RUN pip install pyyaml
 COPY ./watchdog/ /watchdog/
 COPY ./constants/constants.py /watchdog/
 COPY ./middleware/rabbitmq_queue.py /watchdog/
+COPY ./leader/leader.py /watchdog/
 COPY cluster_config.yml /watchdog/
 COPY docker-compose.yml /watchdog/
+
 
 WORKDIR /watchdog/

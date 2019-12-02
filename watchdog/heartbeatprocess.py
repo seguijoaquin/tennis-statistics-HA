@@ -3,9 +3,10 @@ import time
 import os
 from rabbitmq_queue import RabbitMQQueue
 import threading
-from watchdog import watchdog
 
-HEARTBEAT_INTERVAL = watchdog.HEARTBEAT_TIMEOUT/3
+HEARTBEAT_EXCHANGE = "watchdogx"
+HEARTBEAT_TIMEOUT = 1.2
+HEARTBEAT_INTERVAL = HEARTBEAT_TIMEOUT/3
 
 class HeartbeatProcess:
     """This class factorizes the heartbeat protocol.
@@ -36,7 +37,7 @@ class HeartbeatProcess:
         self.callback = callback
         logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname))
         self.exchange = RabbitMQQueue(
-            exchange=watchdog.EXCHANGE,
+            exchange=HEARTBEAT_EXCHANGE,
             consumer=False, exchange_type="fanout")
 
     @staticmethod
@@ -56,7 +57,6 @@ class HeartbeatProcess:
         self.thread.start()
     def periodic_heartbeat(self):
         while True:
-            logging.info("Sending hearbeat")
             self.exchange.publish("heartbeat,{},{}".format(self.hostname, self.metadata))
             time.sleep(HEARTBEAT_INTERVAL)
 

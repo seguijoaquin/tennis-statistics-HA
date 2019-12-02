@@ -3,8 +3,8 @@ import time
 import threading
 import subprocess
 import os
-
 from rabbitmq_queue import RabbitMQQueue
+
 
 EXCHANGE = "watchdogx"
 CHECK_INTERVAL = 1
@@ -25,13 +25,15 @@ class WatchdogProcess:
     def __init__(self, hostname):
         self.hostname = hostname
         self.basedirname  = os.getenv("BASEDIRNAME", "error")
-        result = subprocess.run(['docker', 'images'],
-            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logging.info('images command executed. Result={}. Output={}. Error={}'.format(
-            result.returncode, result.stdout, result.stderr))
         self.load_default_config()
+
+    def run(self):
+        logging.info("Starting Watchdog Logic")
+        logging.info("Setting up queues")
         self.setup_queues()
+        logging.info("Launching receiver thread")
         self.launch_receiver_thread()
+        logging.info("Launching checker")
         self.launch_checker()
 
     def setup_queues(self):
@@ -51,7 +53,7 @@ class WatchdogProcess:
                 "{}_{}".format(key,i):time.time()+STARTING_TOLERANCE
                 for i in range(self.default_config[key])}
             self.last_timeout.update(structure_single_key)
-        del self.last_timeout[self.hostname]
+        #del self.last_timeout[self.hostname]
         # Special structure to indicate that a container is being restarted and
         # should not be checked for timeouts.
         self.respawning = {k: False for k in self.last_timeout.keys()}
@@ -87,9 +89,6 @@ class WatchdogProcess:
     def container_is_running(self, imgid):
         result = subprocess.run(['docker', 'ps'],
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logging.info('PS command executed. Result={}. Output={}. Error={}'.format(
-            result.returncode, result.stdout, result.stderr))
-
         return imgid in str(result.stdout)
 
     def respawn_container(self, imgid):
@@ -118,10 +117,21 @@ class WatchdogProcess:
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
+    from leader import ElectableProcess
+    from heartbeatprocess import HeartbeatProcess
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.INFO)
     logging.info("Started watchdog!")
     hostname = os.getenv("HOSTNAME", "-1")
-    logging.info("Hostname is: {}".format(hostname))
-    proc = WatchdogProcess(hostname)
+    pid = int(os.getenv("PID", 1))
+    logging.info("Hostname is: {}, PID is {}".format(hostname, pid))
+
+    wp = WatchdogProcess(hostname)
+    pidlist = [n for n in range(wp.default_config["watchdog"])
+        if n != pid]
+
+    #proc = ElectableProcess(pid, pidlist, wp.run)
+    hb = HeartbeatProcess.setup(ElectableProcess,
+            pid, pidlist, wp.run)
+    hb.run()
