@@ -4,6 +4,7 @@ import os
 import logging
 from constants import END
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 END_ENCODED = END.encode()
 
@@ -17,7 +18,7 @@ class Accumulator:
                                       routing_keys=routing_key.split('-'))
         self.out_queue = RabbitMQQueue(exchange=output_exchange)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.add)
 
     def add(self, ch, method, properties, body):
@@ -41,5 +42,7 @@ if __name__ == '__main__':
     routing_key = os.environ['ROUTING_KEY']
     exchange = os.environ['EXCHANGE']
     output_exchange = os.environ['OUTPUT_EXCHANGE']
-    accumulator = Accumulator(routing_key, exchange, output_exchange)
-    accumulator.run()
+
+    hb = heartbeatprocess.HeartbeatProcess.setup(Accumulator, routing_key, exchange, output_exchange)
+    hb.run()
+

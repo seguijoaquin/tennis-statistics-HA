@@ -25,7 +25,7 @@ templates = {
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: ${{SURFACE_DISPATCHERS_NUMBER}}
+      PROCESSES_NUMBER: {SURFACE_DISPATCHERS_NUMBER}
       IN_EXCHANGE: dispatcher_terminator
       GROUP_EXCHANGE: matches
       NEXT_EXCHANGE: surfaces
@@ -112,7 +112,7 @@ templates = {
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: ${{JOINERS_NUMBER}}
+      PROCESSES_NUMBER: {JOINERS_NUMBER}
       IN_EXCHANGE: joiner_terminator
       GROUP_EXCHANGE: matches
       NEXT_EXCHANGE: joined
@@ -142,7 +142,7 @@ templates = {
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: ${{AGE_CALCULATORS_NUMBER}}
+      PROCESSES_NUMBER: {AGE_CALCULATORS_NUMBER}
       IN_EXCHANGE: calculator_terminator
       GROUP_EXCHANGE: joined
       NEXT_EXCHANGE: player_age
@@ -172,7 +172,7 @@ templates = {
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: ${{AGE_DIFFERENCE_FILTERS_NUMBER}}
+      PROCESSES_NUMBER: {AGE_DIFFERENCE_FILTERS_NUMBER}
       IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
       NEXT_EXCHANGE: database
@@ -202,7 +202,7 @@ templates = {
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: ${{DIFFERENT_HANDS_FILTERS_NUMBER}}
+      PROCESSES_NUMBER: {DIFFERENT_HANDS_FILTERS_NUMBER}
       IN_EXCHANGE: hands_filter_terminator
       GROUP_EXCHANGE: joined
       NEXT_EXCHANGE: hands
@@ -310,7 +310,7 @@ services:
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 5s
-      timeout: 15s
+      timeout: 40s
       retries: 10
 """
 
@@ -325,4 +325,10 @@ if __name__ == "__main__":
         for key in templates.keys():
             amount = 1 if key not in cluster_config else cluster_config[key]
             for i in range(amount):
-                f.write(templates[key].format(i, basedirname=basedirname))
+                f.write(templates[key].format(i,
+                  basedirname=basedirname,
+                  SURFACE_DISPATCHERS_NUMBER=cluster_config["surface_dispatcher"],
+                  AGE_CALCULATORS_NUMBER=cluster_config["age_calculator"],
+                  AGE_DIFFERENCE_FILTERS_NUMBER=cluster_config["age_difference_filter"],
+                  DIFFERENT_HANDS_FILTERS_NUMBER=cluster_config["different_hands_filter"],
+                  JOINERS_NUMBER=cluster_config["joiner"]))

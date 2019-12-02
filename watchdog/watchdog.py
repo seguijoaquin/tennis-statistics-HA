@@ -45,6 +45,8 @@ class WatchdogProcess:
 
         self.last_timeout = {}
         for key in self.default_config.keys():
+            if key == "client":
+                continue
             structure_single_key = {
                 "{}_{}".format(key,i):time.time()+STARTING_TOLERANCE
                 for i in range(self.default_config[key])}

@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 from rabbitmq_queue import RabbitMQQueue
 import threading
 from watchdog import watchdog
@@ -37,6 +38,17 @@ class HeartbeatProcess:
         self.exchange = RabbitMQQueue(
             exchange=watchdog.EXCHANGE,
             consumer=False, exchange_type="fanout")
+
+    @staticmethod
+    def setup(classname, *args, **kwargs):
+        """Given a class with a run() method, tries to start a heartbeat process
+        loading the hostname from the environment variable HOSTNAME.
+        Starts with no metadata."""
+
+        def run_logic(hbproc):
+            obj = classname(*args, **kwargs)
+            obj.run(hbproc)
+        return HeartbeatProcess(os.getenv("HOSTNAME","-1"), "", run_logic)
 
     def start_heartbeat_thread(self):
         logging.info("Starting heartbeat thread..")
