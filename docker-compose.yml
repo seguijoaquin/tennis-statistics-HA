@@ -249,3 +249,25 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  storage_2:
+    build:
+      context: .
+      dockerfile: storage/Dockerfile
+    command: python3 -u ./storage.py
+    environment:
+      PID: 2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  storage_3:
+    build:
+      context: .
+      dockerfile: storage/Dockerfile
+    command: python3 -u ./storage.py
+    environment:
+      PID: 3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
