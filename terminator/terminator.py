@@ -5,9 +5,6 @@ import logging
 from constants import END, CLOSE, OK
 from rabbitmq_queue import RabbitMQQueue
 
-END_ENCODED = END.encode()
-OK_ENCODED = OK.encode()
-
 class Terminator:
     def __init__(self, processes_number, in_exchange, group_exchange, \
                  group_exchange_type, group_routing_key, next_exchange, \
@@ -46,8 +43,7 @@ class Terminator:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.ERROR)
 
     processes_number = int(os.environ['PROCESSES_NUMBER'])
     in_exchange = os.environ['IN_EXCHANGE']

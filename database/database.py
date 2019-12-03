@@ -16,7 +16,7 @@ class Database:
         self.in_queue.consume(self.persist)
 
     def persist(self, ch, method, properties, body):
-        logging.info('Received %r' % body)
+        logging.info('Received %r from %s' % (body, method.routing_key))
         data = body.decode().split(',')
         id = data[0]
         result = data[1]
@@ -42,7 +42,6 @@ class Database:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.INFO)
     database = Database()
     database.run()

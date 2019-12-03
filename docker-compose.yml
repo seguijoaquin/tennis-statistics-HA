@@ -263,8 +263,7 @@ services:
       rabbitmq:
         condition: service_healthy
     depends_on:
-      - joiner
-      - surface_dispatcher
+      - date_filter
 
   database:
     build:

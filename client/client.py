@@ -2,10 +2,9 @@
 
 import logging, sys, getopt
 from glob import glob
-from constants import END, RESPONSE_EXCHANGE, PLAYERS_EXCHANGE, MATCHES_EXCHANGE
+from constants import END, RESPONSE_EXCHANGE, MATCHES_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
-PLAYERS_DATA = './data/atp_players.csv'
 MATCHES_DATA = './data/atp_matches_*.csv'
 FROM_DEFAULT = '20000101'
 TO_DEFAULT = '20200101'
@@ -17,7 +16,6 @@ class Client:
         self.results = 0
         self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + self.metadata[2],
                                       consumer=True, exclusive=True)
-        self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE)
         self.matches_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE)
 
     def parse_args(self, argv):
@@ -40,18 +38,8 @@ class Client:
             sys.exit(2)
 
     def run(self):
-        self.send_players_data()
         self.send_matches_data()
         self.in_queue.consume(self.print_response)
-
-    def send_players_data(self):
-        with open(PLAYERS_DATA, 'r') as file:
-            file.readline()
-            for line in iter(file.readline, ''):
-                self.players_queue.publish(line)
-                logging.info('Sent %s' % line)
-
-        self.players_queue.publish(END)
 
     def send_matches_data(self):
         for filename in glob(MATCHES_DATA):
@@ -64,6 +52,7 @@ class Client:
 
         end = ','.join([self.metadata[2], END])
         self.matches_queue.publish(end)
+        logging.info('Sent %s' % end)
 
     def print_response(self, ch, method, properties, body):
         print(body.decode())
@@ -73,7 +62,6 @@ class Client:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
     client = Client(sys.argv[1:])
     client.run()

@@ -4,8 +4,6 @@ import logging
 from constants import END, CLOSE, OK, MATCHES_EXCHANGE, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
-END_ENCODED = END.encode()
-CLOSE_ENCODED = CLOSE.encode()
 MATCHES_QUEUE = 'matches_queue'
 TERMINATOR_EXCHANGE = 'date_filter_terminator'
 
@@ -45,7 +43,6 @@ class DateFilter:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
 
     filter = DateFilter()

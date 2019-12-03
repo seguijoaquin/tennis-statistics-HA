@@ -5,8 +5,6 @@ from constants import END, CLOSE, OK, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
 SURFACES = ['Hard', 'Clay', 'Carpet', 'Grass']
-END_ENCODED = END.encode()
-CLOSE_ENCODED = CLOSE.encode()
 SURFACE_EXCHANGE = 'surfaces'
 FILTERED_QUEUE = 'matches_surface'
 TERMINATOR_EXCHANGE = 'dispatcher_terminator'
@@ -50,7 +48,6 @@ class SurfaceDispatcher:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
 
     dispatcher = SurfaceDispatcher()
