@@ -4,6 +4,7 @@ import pika
 import logging
 from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, MATCHES_EXCHANGE, PLAYERS_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 END_ENCODED = END.encode()
 CLOSE_ENCODED = CLOSE.encode()
@@ -20,7 +21,7 @@ class Joiner:
         self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE)
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.players_queue.consume(self.save_player)
         self.matches_queue.consume(self.join)
 
@@ -56,5 +57,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
-    joiner = Joiner()
-    joiner.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(Joiner)
+    hb.run()

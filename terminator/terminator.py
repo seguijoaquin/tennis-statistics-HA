@@ -4,6 +4,7 @@ import os
 import logging
 from constants import END, CLOSE, OK
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 END_ENCODED = END.encode()
 OK_ENCODED = OK.encode()
@@ -18,7 +19,7 @@ class Terminator:
         self.group_queue = RabbitMQQueue(exchange=group_exchange)
         self.next_queue = RabbitMQQueue(exchange=next_exchange, exchange_type=next_exchange_type)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.close)
 
     def close(self, ch, method, properties, body):
@@ -48,7 +49,9 @@ if __name__ == '__main__':
     next_exchange_type = os.environ['NEXT_EXCHANGE_TYPE']
     next_routing_keys = os.environ['NEXT_ROUTING_KEYS']
 
-    terminator = Terminator(processes_number, in_exchange,
-                            group_exchange, next_exchange,
-                            next_exchange_type, next_routing_keys)
-    terminator.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(
+        Terminator,
+        processes_number, in_exchange,
+        group_exchange, next_exchange,
+        next_exchange_type, next_routing_keys)
+    hb.run()
