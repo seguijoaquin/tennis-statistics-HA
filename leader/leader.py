@@ -1,7 +1,7 @@
 import os
 import logging
 import time
-import threading
+import multiprocessing
 from rabbitmq_queue import RabbitMQQueue
 
 HEARTBEAT_INTERVAL = 0.3
@@ -56,6 +56,7 @@ class ElectableProcess:
         data = body.decode().split(',')
         logging.info("Received {}".format(body.decode()))
         if data[0] == "election":
+            self.received_election = True
             logging.info("Sending answer,{} to {}".format(self.pid, data[1]))
             self.exchange.publish("answer,{}".format(self.pid), data[1])
         elif data[0] == "answer":
@@ -66,6 +67,7 @@ class ElectableProcess:
     def start_election(self):
         self.received_answer = False
         self.leader = None
+        self.received_election = False
 
         logging.info("Starting election -- sending ELECTION")
         for remote_pid in self.pid_list:
@@ -105,6 +107,7 @@ class ElectableProcess:
             self.leader = self.pid
 
 
+        self.received_election = False
         if self.leader == self.pid:
             logging.info("Starting leader logic in this process")
             self.start_leader()
@@ -113,12 +116,16 @@ class ElectableProcess:
             self.follow_leader()
 
     def start_leader(self):
-        self.logic_thread = threading.Thread(target=self.onleader_callback)
-        self.logic_thread.start()
+        self.logic_process = multiprocessing.Process(target=self.onleader_callback)
+        self.logic_process.start()
         # set up leader heartbeat
-        while True:
+        while not self.received_election:
             self.leader_ex.publish("heartbeat")
             time.sleep(HEARTBEAT_INTERVAL)
+
+        self.logic_process.terminate()
+        self.start_election()
+
 
     def process_heartbeat(self, ch, method, properties, body):
         self.last_heartbeat = time.time()
@@ -131,12 +138,15 @@ class ElectableProcess:
         self.leader_queue.async_consume(self.process_heartbeat)
         diff = time.time() - self.last_heartbeat
 
-        while diff < TIMEOUT_HEARTBEAT:
+        while diff < TIMEOUT_HEARTBEAT and not self.received_election:
             #logging.info("Sleeping for {}s".format(TIMEOUT_HEARTBEAT - diff + 0.1))
             time.sleep(TIMEOUT_HEARTBEAT - diff + 0.1) # So we don't over-wait
             diff = time.time() - self.last_heartbeat
 
-        logging.info("Timed out leader. About to start a new election")
+        if diff > TIMEOUT_HEARTBEAT:
+            logging.info("Timed out leader. About to start a new election")
+        else:
+            logging.info("Received ELECTION. Starting election..")
         self.start_election()
 
 if __name__ == '__main__':
