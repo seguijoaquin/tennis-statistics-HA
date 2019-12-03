@@ -1,6 +1,7 @@
 import os
 import logging
 import time
+import threading
 from rabbitmq_queue import RabbitMQQueue
 
 HEARTBEAT_INTERVAL = 0.3
@@ -34,10 +35,10 @@ class ElectableProcess:
         self.onleader_callback = callback
         logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.pid))
 
+    def run(self, _):
         self.setup_queues()
-
-        logging.info("Waiting 10s for starting everything..")
-        time.sleep(10)
+        logging.info("Waiting 5s for starting everything..")
+        time.sleep(5)
         self.start_election()
 
     def setup_queues(self):
@@ -106,16 +107,16 @@ class ElectableProcess:
 
         if self.leader == self.pid:
             logging.info("Starting leader logic in this process")
-            #async self.onleader_callback()
             self.start_leader()
         else:
             logging.info("Following leader...")
             self.follow_leader()
 
     def start_leader(self):
+        self.logic_thread = threading.Thread(target=self.onleader_callback)
+        self.logic_thread.start()
         # set up leader heartbeat
         while True:
-            logging.info("Sent heartbeat")
             self.leader_ex.publish("heartbeat")
             time.sleep(HEARTBEAT_INTERVAL)
 
@@ -131,7 +132,7 @@ class ElectableProcess:
         diff = time.time() - self.last_heartbeat
 
         while diff < TIMEOUT_HEARTBEAT:
-            logging.info("Sleeping for {}s".format(TIMEOUT_HEARTBEAT - diff + 0.1))
+            #logging.info("Sleeping for {}s".format(TIMEOUT_HEARTBEAT - diff + 0.1))
             time.sleep(TIMEOUT_HEARTBEAT - diff + 0.1) # So we don't over-wait
             diff = time.time() - self.last_heartbeat
 
