@@ -26,12 +26,14 @@ class AgeDifferenceFilter:
         if data[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == CLOSE:
             body = ','.join([id, OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         winner_age = int(data[5])
@@ -43,6 +45,7 @@ class AgeDifferenceFilter:
             body = ','.join([id, result])
             self.out_queue.publish(body, ROUTING_KEY)
             logging.info('Sent %s' % body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

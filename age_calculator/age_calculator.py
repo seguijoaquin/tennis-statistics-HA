@@ -27,18 +27,21 @@ class AgeCalculator:
         if data[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == CLOSE:
             body = ','.join([data[0], OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         tourney_date = data[1]
         winner_birthdate = data[5]
         loser_birthdate = data[9]
         if winner_birthdate == '' or loser_birthdate == '':
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         tourney_date = datetime.strptime(tourney_date, '%Y%m%d')
@@ -49,6 +52,7 @@ class AgeCalculator:
         body = ','.join(data)
         self.out_queue.publish(body)
         logging.info('Sent %s' % body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _compute_age(self, birthdate, tourney_date):
         years = tourney_date.year - birthdate.year

@@ -57,6 +57,7 @@ class Client:
     def print_response(self, ch, method, properties, body):
         print(body.decode())
         self.results += 1
+        ch.basic_ack(delivery_tag=method.delivery_tag)
         if self.results == 3:
             self.in_queue.cancel()
 

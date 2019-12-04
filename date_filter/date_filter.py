@@ -23,23 +23,27 @@ class DateFilter:
         if match[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if match[1] == CLOSE:
             body = ','.join([match[0], OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         date_from = match[0]
         date_to = match[1]
         tourney_date = match[5]
         if tourney_date < date_from or tourney_date > date_to:
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
         data = ','.join(match[2:])
         self.out_queue.publish(data, 'joiner')
         self.out_queue.publish(data, 'dispatcher')
         logging.info('Sent %s' % data)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

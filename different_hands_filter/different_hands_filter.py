@@ -29,12 +29,14 @@ class DifferentHandsFilter:
         if data[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == CLOSE:
             body = ','.join([data[0], OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         winner_hand = data[4]
@@ -43,6 +45,7 @@ class DifferentHandsFilter:
             body = ','.join([id, '1'])
             self.out_queue.publish(body, winner_hand)
             logging.info('Sent %s to %s accumulator' % (body, winner_hand))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

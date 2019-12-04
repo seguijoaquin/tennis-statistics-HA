@@ -27,12 +27,14 @@ class SurfaceDispatcher:
         if data[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == CLOSE:
             body = ','.join([data[0], OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         id = data[0]
@@ -40,11 +42,13 @@ class SurfaceDispatcher:
         minutes = data[10]
 
         if minutes == '' or surface in ('', 'None'):
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         body = ','.join([id, minutes])
         self.out_queue.publish(body, surface)
         logging.info('Sent %s to %s accumulator' % (body, surface))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

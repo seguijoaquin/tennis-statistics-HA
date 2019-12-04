@@ -25,6 +25,7 @@ class Database:
             self.count[id] = self.count.get(id, 0) + 1
 
             if self.count[id] != 3:
+                ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
             for filename in FILES:
@@ -34,11 +35,13 @@ class Database:
                 out_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + id)
                 out_queue.publish(response)
                 logging.info('Sent %s' % response)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         file = open(method.routing_key + id, 'a+')
         file.write(result + '\n')
         file.close()
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

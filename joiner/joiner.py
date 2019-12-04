@@ -35,12 +35,14 @@ class Joiner:
         if data[1] == END:
             self.terminator_queue.publish(body)
             logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == CLOSE:
             body = ','.join([data[0], OK])
             self.terminator_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         winner_id = data[5]
@@ -50,6 +52,7 @@ class Joiner:
         self.out_queue.publish(body, 'filter')
         self.out_queue.publish(body, 'calculator')
         logging.info('Sent %s' % body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

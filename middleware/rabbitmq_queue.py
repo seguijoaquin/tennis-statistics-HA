@@ -6,7 +6,7 @@ HOST = 'rabbitmq'
 
 class RabbitMQQueue:
     def __init__(self, exchange, exchange_type='fanout', consumer=False, exclusive=False, queue_name='', routing_keys=[None]):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=HOST))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=HOST, heartbeat=0))
         self.channel = connection.channel()
 
         self.exchange = exchange
@@ -24,8 +24,7 @@ class RabbitMQQueue:
                                    properties=pika.BasicProperties(delivery_mode=2,))
 
     def consume(self, callback):
-        self.tag = self.channel.basic_consume(queue=self.queue_name, auto_ack=True,
-                                              on_message_callback=callback)
+        self.tag = self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback)
         self.channel.start_consuming()
 
     def cancel(self):

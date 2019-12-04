@@ -29,6 +29,7 @@ class Terminator:
                 body = ','.join([data[0], CLOSE])
                 self.group_queue.publish(body, self.group_routing_key)
                 logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if data[1] == OK:
@@ -40,6 +41,7 @@ class Terminator:
                     body = ','.join([id, END])
                     self.next_queue.publish(body, routing_key)
                     logging.info('Sent %s' % body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

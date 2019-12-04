@@ -29,11 +29,13 @@ class PercentageCalculator:
         if hand == RIGHT:
             self.hands[id][0] = float(amount)
             if self.hands[id][1] is None:
+                ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
         if hand == NO_RIGHT:
             self.hands[id][1] = float(amount)
             if self.hands[id][0] is None:
+                ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
         right_percentage = 100 * self.hands[id][0] / (self.hands[id][0] + self.hands[id][1])
@@ -51,6 +53,7 @@ class PercentageCalculator:
 
         body = ','.join([id, END])
         self.out_queue.publish(body, ROUTING_KEY)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

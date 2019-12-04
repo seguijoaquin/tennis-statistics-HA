@@ -27,6 +27,7 @@ class Accumulator:
             body = ','.join([id, self.routing_key, str(amount), str(total)])
             self.out_queue.publish(body)
             logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
         if not id in self.values:
@@ -36,6 +37,7 @@ class Accumulator:
         logging.debug('Current amount: %f' % self.values[id][0])
         self.values[id][1] += float(data[1])
         logging.debug('Current total: %f' % self.values[id][1])
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',

@@ -30,6 +30,7 @@ class AverageCalculator:
             end = ','.join([id, END])
             self.out_queue.publish(end, ROUTING_KEY)
             logging.info('Sent %s' % end)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
