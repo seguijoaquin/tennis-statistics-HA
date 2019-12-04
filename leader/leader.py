@@ -1,7 +1,7 @@
 import os
 import logging
 import time
-import threading
+import multiprocessing
 from rabbitmq_queue import RabbitMQQueue
 
 HEARTBEAT_INTERVAL = 0.3
@@ -17,6 +17,7 @@ TIMEOUT_ANSWER = 2*TIMEOUT_TRANSFER + TIMEOUT_PROCESS
 # is waiting for an ANSWER. Therefore it seems straightforward
 # to set it so:
 TIMEOUT_COORD = 2*TIMEOUT_ANSWER
+INITIAL_SLEEP = 5 # seconds to wait after the container is up
 
 ELECTION_EXCHANGE = "electx"
 LEADER_EXCHANGE = "leaderx"
@@ -33,13 +34,16 @@ class ElectableProcess:
         self.pid = pid
         self.pid_list = pid_list
         self.onleader_callback = callback
+        self.received_answer = False
+        self.leader = None
         logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.pid))
 
     def run(self, _):
         self.setup_queues()
-        logging.info("Waiting 5s for starting everything..")
-        time.sleep(5)
-        self.start_election()
+        logging.info("Waiting {}s for starting everything.".format(INITIAL_SLEEP))
+        time.sleep(INITIAL_SLEEP)
+        logging.info("Starting off as listening to heartbeats..")
+        self.follow_leader()
 
     def setup_queues(self):
         self.exchange = RabbitMQQueue(
@@ -113,12 +117,16 @@ class ElectableProcess:
             self.follow_leader()
 
     def start_leader(self):
-        self.logic_thread = threading.Thread(target=self.onleader_callback)
-        self.logic_thread.start()
+        self.logic_process = multiprocessing.Process(target=self.onleader_callback)
+        self.logic_process.start()
         # set up leader heartbeat
         while True:
             self.leader_ex.publish("heartbeat")
             time.sleep(HEARTBEAT_INTERVAL)
+
+        self.logic_process.terminate()
+        self.start_election()
+
 
     def process_heartbeat(self, ch, method, properties, body):
         self.last_heartbeat = time.time()
