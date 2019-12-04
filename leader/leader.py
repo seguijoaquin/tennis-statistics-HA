@@ -17,6 +17,7 @@ TIMEOUT_ANSWER = 2*TIMEOUT_TRANSFER + TIMEOUT_PROCESS
 # is waiting for an ANSWER. Therefore it seems straightforward
 # to set it so:
 TIMEOUT_COORD = 2*TIMEOUT_ANSWER
+INITIAL_SLEEP = 5 # seconds to wait after the container is up
 
 ELECTION_EXCHANGE = "electx"
 LEADER_EXCHANGE = "leaderx"
@@ -33,13 +34,16 @@ class ElectableProcess:
         self.pid = pid
         self.pid_list = pid_list
         self.onleader_callback = callback
+        self.received_answer = False
+        self.leader = None
         logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.pid))
 
     def run(self, _):
         self.setup_queues()
-        logging.info("Waiting 5s for starting everything..")
-        time.sleep(5)
-        self.start_election()
+        logging.info("Waiting {}s for starting everything.".format(INITIAL_SLEEP))
+        time.sleep(INITIAL_SLEEP)
+        logging.info("Starting off as listening to heartbeats..")
+        self.follow_leader()
 
     def setup_queues(self):
         self.exchange = RabbitMQQueue(
@@ -56,7 +60,6 @@ class ElectableProcess:
         data = body.decode().split(',')
         logging.info("Received {}".format(body.decode()))
         if data[0] == "election":
-            self.received_election = True
             logging.info("Sending answer,{} to {}".format(self.pid, data[1]))
             self.exchange.publish("answer,{}".format(self.pid), data[1])
         elif data[0] == "answer":
@@ -67,7 +70,6 @@ class ElectableProcess:
     def start_election(self):
         self.received_answer = False
         self.leader = None
-        self.received_election = False
 
         logging.info("Starting election -- sending ELECTION")
         for remote_pid in self.pid_list:
@@ -107,7 +109,6 @@ class ElectableProcess:
             self.leader = self.pid
 
 
-        self.received_election = False
         if self.leader == self.pid:
             logging.info("Starting leader logic in this process")
             self.start_leader()
@@ -119,7 +120,7 @@ class ElectableProcess:
         self.logic_process = multiprocessing.Process(target=self.onleader_callback)
         self.logic_process.start()
         # set up leader heartbeat
-        while not self.received_election:
+        while True:
             self.leader_ex.publish("heartbeat")
             time.sleep(HEARTBEAT_INTERVAL)
 
@@ -138,15 +139,12 @@ class ElectableProcess:
         self.leader_queue.async_consume(self.process_heartbeat)
         diff = time.time() - self.last_heartbeat
 
-        while diff < TIMEOUT_HEARTBEAT and not self.received_election:
+        while diff < TIMEOUT_HEARTBEAT:
             #logging.info("Sleeping for {}s".format(TIMEOUT_HEARTBEAT - diff + 0.1))
             time.sleep(TIMEOUT_HEARTBEAT - diff + 0.1) # So we don't over-wait
             diff = time.time() - self.last_heartbeat
 
-        if diff > TIMEOUT_HEARTBEAT:
-            logging.info("Timed out leader. About to start a new election")
-        else:
-            logging.info("Received ELECTION. Starting election..")
+        logging.info("Timed out leader. About to start a new election")
         self.start_election()
 
 if __name__ == '__main__':
