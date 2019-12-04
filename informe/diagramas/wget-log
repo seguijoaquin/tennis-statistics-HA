@@ -1,11 +1,0 @@
---2019-12-04 20:44:26--  https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fc%2Fc3%2FLogo-fiuba_big.png
-Resolving external-content.duckduckgo.com (external-content.duckduckgo.com)... 23.21.193.199, 50.16.241.130
-Connecting to external-content.duckduckgo.com (external-content.duckduckgo.com)|23.21.193.199|:443... connected.
-HTTP request sent, awaiting response... 200 OK
-Length: unspecified [image/png]
-Saving to: ‘index.html?u=https:%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fc%2Fc3%2FLogo-fiuba_big.png’
-
-                  index.html?u=https     [<=>                                                                  ]       0  --.-KB/s               index.html?u=https:%2F%2Fupload.wiki     [ <=>                                                                 ]  56,12K   302KB/s    in 0,2s    
-
-2019-12-04 20:44:27 (302 KB/s) - ‘index.html?u=https:%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fc%2Fc3%2FLogo-fiuba_big.png’ saved [57468]
-
