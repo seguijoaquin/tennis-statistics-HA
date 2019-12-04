@@ -5,5 +5,6 @@ RUN pip install pika
 COPY ./database/ /database/
 COPY ./constants/constants.py /database/
 COPY ./middleware/rabbitmq_queue.py /database/
+COPY ./watchdog/ /database/watchdog/
 
 WORKDIR /database/

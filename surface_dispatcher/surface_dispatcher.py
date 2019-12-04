@@ -3,6 +3,7 @@
 import logging
 from constants import END, CLOSE, OK, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 SURFACES = ['Hard', 'Clay', 'Carpet', 'Grass']
 SURFACE_EXCHANGE = 'surfaces'
@@ -17,7 +18,7 @@ class SurfaceDispatcher:
         self.out_queue = RabbitMQQueue(exchange=SURFACE_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.dispatch)
 
     def dispatch(self, ch, method, properties, body):
@@ -54,5 +55,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    dispatcher = SurfaceDispatcher()
-    dispatcher.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(SurfaceDispatcher)
+    hb.run()

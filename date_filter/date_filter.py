@@ -3,6 +3,7 @@
 import logging
 from constants import END, CLOSE, OK, MATCHES_EXCHANGE, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 MATCHES_QUEUE = 'matches_queue'
 TERMINATOR_EXCHANGE = 'date_filter_terminator'
@@ -14,7 +15,7 @@ class DateFilter:
         self.out_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.filter)
 
     def filter(self, ch, method, properties, body):
@@ -49,5 +50,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    filter = DateFilter()
-    filter.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(DateFilter)
+    hb.run()

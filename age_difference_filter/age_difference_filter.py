@@ -3,6 +3,7 @@
 import logging
 from constants import END, CLOSE, OK, OUT_AGE_CALCULATOR_EXCHANGE, DATABASE_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 AGE_DIFFERENCE_FILTER_QUEUE = 'age_queue'
 ROUTING_KEY = 'age'
@@ -15,7 +16,7 @@ class AgeDifferenceFilter:
         self.out_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.filter)
 
     def filter(self, ch, method, properties, body):
@@ -51,5 +52,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    filter = AgeDifferenceFilter()
-    filter.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(AgeDifferenceFilter)
+    hb.run()

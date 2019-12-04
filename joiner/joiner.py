@@ -3,6 +3,7 @@
 import logging
 from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 PLAYERS_DATA = 'atp_players.csv'
 FILTERED_QUEUE = 'matches_join'
@@ -17,7 +18,7 @@ class Joiner:
         self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.save_players()
         self.matches_queue.consume(self.join)
 
@@ -57,5 +58,5 @@ class Joiner:
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
-    joiner = Joiner()
-    joiner.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(Joiner)
+    hb.run()

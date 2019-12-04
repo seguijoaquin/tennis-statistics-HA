@@ -4,6 +4,7 @@ import pika
 import logging
 from constants import END, DATABASE_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 ROUTING_KEY = 'hand'
 RIGHT = 'R'
@@ -16,7 +17,7 @@ class PercentageCalculator:
         self.in_queue = RabbitMQQueue(exchange=HANDS_EXCHANGE, consumer=True, exclusive=True)
         self.out_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct')
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.calculate)
 
     def calculate(self, ch, method, properties, body):
@@ -59,5 +60,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    calculator = PercentageCalculator()
-    calculator.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(PercentageCalculator)
+    hb.run()

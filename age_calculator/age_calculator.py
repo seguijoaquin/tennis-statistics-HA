@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from constants import END, OK, CLOSE, OUT_JOINER_EXCHANGE, OUT_AGE_CALCULATOR_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 AGE_CALCULATOR_QUEUE = 'joined_age'
 TERMINATOR_EXCHANGE = 'calculator_terminator'
@@ -16,7 +17,7 @@ class AgeCalculator:
         self.out_queue = RabbitMQQueue(exchange=OUT_AGE_CALCULATOR_EXCHANGE)
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.calculate)
 
     def calculate(self, ch, method, properties, body):
@@ -65,5 +66,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    calculator = AgeCalculator()
-    calculator.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(AgeCalculator)
+    hb.run()

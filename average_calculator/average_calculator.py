@@ -3,6 +3,7 @@
 import logging
 from constants import END, DATABASE_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 AVERAGE_CALCULATOR_EXCHANGE = 'surface_values'
 ROUTING_KEY = 'surface'
@@ -14,7 +15,7 @@ class AverageCalculator:
                                       exclusive=True)
         self.out_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct')
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.calculate)
 
     def calculate(self, ch, method, properties, body):
@@ -36,5 +37,5 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
 
-    calculator = AverageCalculator()
-    calculator.run()
+    hb = heartbeatprocess.HeartbeatProcess.setup(AverageCalculator)
+    hb.run()

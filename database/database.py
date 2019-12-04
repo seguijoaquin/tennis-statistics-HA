@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
+import os
 from constants import END, DATABASE_EXCHANGE, RESPONSE_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
+from watchdog import heartbeatprocess
 
 FILES = ['surface', 'hand', 'age']
 
@@ -12,7 +14,7 @@ class Database:
         self.in_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct',
                                       consumer=True, exclusive=True, routing_keys=FILES)
 
-    def run(self):
+    def run(self, _):
         self.in_queue.consume(self.persist)
 
     def persist(self, ch, method, properties, body):
@@ -46,5 +48,6 @@ class Database:
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
                         level=logging.ERROR)
-    database = Database()
-    database.run()
+
+    hb = heartbeatprocess.HeartbeatProcess.setup(Database)
+    hb.run()
