@@ -24,6 +24,7 @@ class RabbitMQQueue:
                                    properties=pika.BasicProperties(delivery_mode=2,))
 
     def consume(self, callback):
+        self.channel.basic_qos(prefetch_count=1)
         self.tag = self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback)
         self.channel.start_consuming()
 
