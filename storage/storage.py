@@ -93,7 +93,8 @@ class Storage:
         f.close()
         
         response = contents
-        self.output_queue.publish(response)
+        client_routing_key = str(job_id) + str(filename)
+        self.output_queue.publish(response, client_routing_key)
 
     def getStorageShard(self, id):
         return id % 2
