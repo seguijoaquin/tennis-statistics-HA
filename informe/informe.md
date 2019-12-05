@@ -45,7 +45,7 @@ documentclass: scrartcl
 
 \ \ \
 
-**Alumnos**: Kevin Cajachuan (98725), Joaquín Seguí, Joaquín Torré Zaffaroni(98314)
+**Alumnos**: Kevin Cajachuán (98725), Joaquín Seguí, Joaquín Torré Zaffaroni(98314)
 
 **Materia**: Sistemas Distribuidos I, 75.74
 
@@ -73,9 +73,17 @@ y marcamos puntos de mejora.
 
 ## Vista lógica
 
-Esta sección no cambia mucho, es el DAG.
-Kevin: lo  que tenías del TP2 más si hiciste algún cambio.
+El DAG de este trabajo práctico es casi el mismo que el DAG del trabajo práctico 2
+con la diferencia de que se agrega la etapa de filtrado del intervalo de fechas
+en el que el cliente quiere que se haga el análisis. Por esta razón el cliente
+le envía las líneas de los archivos al nuevo filtro y a partir de ahí, con las
+líneas filtradas, se divide el procesamiento en 3 ramas:
 
+1. Cálculo de porcentaje de victorias de zurdos sobre diestros y viceversa.
+2. Partidos en los que el ganador tenía al menos 20 años más que el perdedor.
+3. Cálculo del promedio de la duración en minutos de los partidos en cada superficie.
+
+![](diagramas/DAG.png)
 
 ## Vista de desarrollo
 
