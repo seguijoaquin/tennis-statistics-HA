@@ -11,6 +11,7 @@ TERMINATOR_EXCHANGE = 'age_filter_terminator'
 
 class AgeDifferenceFilter:
     def __init__(self):
+        self.acked = set()
         self.in_queue = RabbitMQQueue(exchange=OUT_AGE_CALCULATOR_EXCHANGE, consumer=True,
                                       queue_name=AGE_DIFFERENCE_FILTER_QUEUE)
         self.out_queue = RabbitMQQueue(exchange=DATABASE_EXCHANGE, exchange_type='direct')
@@ -31,8 +32,12 @@ class AgeDifferenceFilter:
             return
 
         if data[1] == CLOSE:
-            body = ','.join([id, OK])
-            self.terminator_queue.publish(body)
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.in_queue.publish(body)
             logging.info('Sent %s' % body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return

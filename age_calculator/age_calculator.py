@@ -11,6 +11,7 @@ TERMINATOR_EXCHANGE = 'calculator_terminator'
 
 class AgeCalculator:
     def __init__(self):
+        self.acked = set()
         self.in_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, exchange_type='direct',
                                       consumer=True, queue_name=AGE_CALCULATOR_QUEUE,
                                       routing_keys=['calculator'])
@@ -32,8 +33,12 @@ class AgeCalculator:
             return
 
         if data[1] == CLOSE:
-            body = ','.join([data[0], OK])
-            self.terminator_queue.publish(body)
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.in_queue.publish(body)
             logging.info('Sent %s' % body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return

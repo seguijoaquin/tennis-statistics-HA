@@ -22,6 +22,28 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  date_filter_1:
+    build:
+      context: .
+      dockerfile: date_filter/Dockerfile
+    environment:
+      HOSTNAME: date_filter_1
+    command: python3 -u ./date_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  date_filter_2:
+    build:
+      context: .
+      dockerfile: date_filter/Dockerfile
+    environment:
+      HOSTNAME: date_filter_2
+    command: python3 -u ./date_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   date_filter_terminator_0:
     build:
       context: .
@@ -52,12 +74,34 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  surface_dispatcher_1:
+    build:
+      context: .
+      dockerfile: surface_dispatcher/Dockerfile
+    command: python3 -u ./surface_dispatcher.py
+    environment:
+      HOSTNAME: surface_dispatcher_1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  surface_dispatcher_2:
+    build:
+      context: .
+      dockerfile: surface_dispatcher/Dockerfile
+    command: python3 -u ./surface_dispatcher.py
+    environment:
+      HOSTNAME: surface_dispatcher_2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   surface_dispatcher_terminator_0:
     build:
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: 1
+      PROCESSES_NUMBER: 3
       IN_EXCHANGE: dispatcher_terminator
       GROUP_EXCHANGE: filtered
       GROUP_EXCHANGE_TYPE: direct
@@ -135,12 +179,34 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  joiner_1:
+    build:
+      context: .
+      dockerfile: joiner/Dockerfile
+    command: python3 -u ./joiner.py
+    environment:
+      HOSTNAME: joiner_1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  joiner_2:
+    build:
+      context: .
+      dockerfile: joiner/Dockerfile
+    command: python3 -u ./joiner.py
+    environment:
+      HOSTNAME: joiner_2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   joiner_terminator_0:
     build:
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: 1
+      PROCESSES_NUMBER: 3
       IN_EXCHANGE: joiner_terminator
       GROUP_EXCHANGE: filtered
       GROUP_EXCHANGE_TYPE: direct
@@ -165,12 +231,34 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  age_calculator_1:
+    build:
+      context: .
+      dockerfile: age_calculator/Dockerfile
+    command: python3 -u ./age_calculator.py
+    environment:
+      HOSTNAME: age_calculator_1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  age_calculator_2:
+    build:
+      context: .
+      dockerfile: age_calculator/Dockerfile
+    command: python3 -u ./age_calculator.py
+    environment:
+      HOSTNAME: age_calculator_2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   age_calculator_terminator_0:
     build:
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: 1
+      PROCESSES_NUMBER: 3
       IN_EXCHANGE: calculator_terminator
       GROUP_EXCHANGE: joined
       GROUP_EXCHANGE_TYPE: direct
@@ -195,12 +283,34 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  age_difference_filter_1:
+    build:
+      context: .
+      dockerfile: age_difference_filter/Dockerfile
+    command: python3 -u ./age_difference_filter.py
+    environment:
+      HOSTNAME: age_difference_filter_1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  age_difference_filter_2:
+    build:
+      context: .
+      dockerfile: age_difference_filter/Dockerfile
+    command: python3 -u ./age_difference_filter.py
+    environment:
+      HOSTNAME: age_difference_filter_2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   age_difference_filter_terminator_0:
     build:
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: 1
+      PROCESSES_NUMBER: 3
       IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
       GROUP_EXCHANGE_TYPE: fanout
@@ -225,12 +335,34 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  different_hands_filter_1:
+    build:
+      context: .
+      dockerfile: different_hands_filter/Dockerfile
+    command: python3 -u ./different_hands_filter.py
+    environment:
+      HOSTNAME: different_hands_filter_1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  different_hands_filter_2:
+    build:
+      context: .
+      dockerfile: different_hands_filter/Dockerfile
+    command: python3 -u ./different_hands_filter.py
+    environment:
+      HOSTNAME: different_hands_filter_2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   different_hands_filter_terminator_0:
     build:
       context: .
       dockerfile: terminator/Dockerfile
     environment:
-      PROCESSES_NUMBER: 1
+      PROCESSES_NUMBER: 3
       IN_EXCHANGE: hands_filter_terminator
       GROUP_EXCHANGE: joined
       GROUP_EXCHANGE_TYPE: direct

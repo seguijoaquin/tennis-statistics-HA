@@ -12,6 +12,7 @@ TERMINATOR_EXCHANGE = 'dispatcher_terminator'
 
 class SurfaceDispatcher:
     def __init__(self):
+        self.acked = set()
         self.in_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct',
                                       consumer=True, queue_name=FILTERED_QUEUE,
                                       routing_keys=['dispatcher'])
@@ -24,6 +25,7 @@ class SurfaceDispatcher:
     def dispatch(self, ch, method, properties, body):
         logging.info('Received %r' % body)
         data = body.decode().split(',')
+        id = data[0]
 
         if data[1] == END:
             self.terminator_queue.publish(body)
@@ -32,13 +34,16 @@ class SurfaceDispatcher:
             return
 
         if data[1] == CLOSE:
-            body = ','.join([data[0], OK])
-            self.terminator_queue.publish(body)
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.in_queue.publish(body)
             logging.info('Sent %s' % body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
-        id = data[0]
         surface = data[4]
         minutes = data[10]
 

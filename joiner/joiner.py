@@ -11,6 +11,7 @@ TERMINATOR_EXCHANGE = 'joiner_terminator'
 
 class Joiner:
     def __init__(self):
+        self.acked = set()
         self.players = {}
         self.matches_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct',
                                            consumer=True, queue_name=FILTERED_QUEUE,
@@ -32,6 +33,7 @@ class Joiner:
     def join(self, ch, method, properties, body):
         logging.info('Received %r' % body)
         data = body.decode().split(',')
+        id = data[0]
 
         if data[1] == END:
             self.terminator_queue.publish(body)
@@ -40,8 +42,12 @@ class Joiner:
             return
 
         if data[1] == CLOSE:
-            body = ','.join([data[0], OK])
-            self.terminator_queue.publish(body)
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.matches_queue.publish(body)
             logging.info('Sent %s' % body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
