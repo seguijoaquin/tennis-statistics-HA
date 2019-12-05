@@ -10,7 +10,7 @@ MASTER_NEEDED_MSG = 'M'
 SLAVE_ROLE  = 'slave'
 MASTER_ROLE = 'master'
 CATCHUP_COMMAND = 'CATCHUP'
-BASE_PATH = "/storage/"
+BASE_PATH = "/data/"
 
 class Storage:
     def __init__(self, pid):
