@@ -45,7 +45,7 @@ documentclass: scrartcl
 
 \ \ \
 
-**Alumnos**: Kevin Cajachuán (98725), Joaquín Seguí, Joaquín Torré Zaffaroni(98314)
+**Alumnos**: Kevin Cajachuán (98725), Joaquín Seguí (91451), Joaquín Torré Zaffaroni(98314)
 
 **Materia**: Sistemas Distribuidos I, 75.74
 
