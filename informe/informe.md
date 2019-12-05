@@ -90,6 +90,18 @@ Comentar cómo se hizo
 
 ### Tolerancia a fallos
 
+Para tolerancia a fallos utilizamos un proceso llamado __Watchdog__ que recibe
+los _heartbeats_ de los demás procesos, y al detectar que uno se cayó los levanta
+con la siguiente lógica:
+
+![](diagramas/watchdog_spawner.png)
+
+Sin embargo, el __Watchdog__ también puede fallar. Debido a eso, tenemos varias
+instancias del nodo corriendo, solo uno en modo líder y el resto en modo _follower_.
+Sólo el líder es el que escucha los _heartbeats_ y levanta los nodos.
+Además, el líder manda sus propios _heartbeats_ al resto de los _followers_, de manera
+de que éstos también puedan saber si se muere. En ese caso, se elige
+un nuevo líder a través del algoritmo Bully.
 
 ![](diagramas/bully.png)
 
@@ -99,6 +111,33 @@ Comentar cómo se hizo
 ### Persistencia
 
 ídem
+
+
+![](diagramas/replicar_info.png)
+
+
+Como el _master_ puede caerse, es necesario que otro nodo asuma el rol.
+Para evitar tener que implementar de nuevo un algoritmo de elección
+de líder, utilizamos el proceso __Watchdog__. En efecto, cada nodo
+de almacenamiento agrega metadata a su _heartbeat_ con la información
+del rol que cumple. Esta información es almacenada por el __Watchdog__
+y esto le permite saber cuándo se cae el nodo maestro.
+
+Entonces es necesario analizar el esquema de replicación teniendo en
+cuenta las fallas de los nodos. En el caso de un esclavo que
+se muere y luego se levanta, simplemente puede seguir leyendo
+de su cola de Rabbit que es durable. Puede pasar que haya persistido
+un dato y se haya caído antes de dar el `ACK`, pero como las
+escrituras son _overwrites_ con _timestamps_ no es problema. Desde
+el punto de vista del nodo maestro, si se cae antes de dar el `ACK`
+el nuevo maestro puede recibir la misma escritura. Por la misma
+razón que antes, esto no es problema.
+
+A continuación se puede ver el diagrama que ilustra la
+generación de un nuevo nodo maestro.
+
+![](diagramas/nuevo_master.png)
+
 
 
 ## Vista física
