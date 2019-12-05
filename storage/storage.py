@@ -2,6 +2,7 @@
 
 import os
 import logging
+import pathlib
 from multiprocessing import Process
 from rabbitmq_queue import RabbitMQQueue
 
@@ -9,6 +10,7 @@ MASTER_NEEDED_MSG = 'M'
 SLAVE_ROLE  = 'slave'
 MASTER_ROLE = 'master'
 CATCHUP_COMMAND = 'CATCHUP'
+BASE_PATH = "/storage/"
 
 class Storage:
     def __init__(self, pid):
@@ -57,26 +59,44 @@ class Storage:
                 ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def persistState(self, body):
-        # TODO: Save state to disk
+        logging.info('Persisting to disk {%r}' % body)
         # MSG = CMD;tipoNodo_nroNodo;estado;ids_vistos;timestamp;job_id
         # EJ: WRITE;joiner_3;93243;10,11,12,13;20191206113249;123123
-        # params = body.decode().split(';')
-        # nodeParams = params[1].split('_')
-        logging.info('Persisting to disk %r' % body)
+        params = body.decode().split(';')
+        storageShard = self.getStorageShard(params[5]) # Shard storage data by job_id into 2 clusters
+        # path = "/storage/shard_id/job_id/"
+        path = BASE_PATH + str(storageShard) + "/" + str(params[5])
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+        # filename = "nodeType_nodeNumber"
+        filename = str(params[1])
+        f = os.open(path + filename, "w+") # Truncates previous state & writes
+        f.write(body)
+        f.close()
+        logging.info('Persisted {%r}' % body)
 
     def isReadRequest(self, b):
-        # MSG = CMD;tipoNodo_nroNodo;timestamp;job_id
-        # EJ: READ;joiner_3;20191201312312;job_id
         if CATCHUP_COMMAND in b.decode():
             return True
         return False
 
     def processRead(self, msg):
-        # TODO: parse msg Catchup;
-        # TODO: fetch state from disk
-        # TODO: build response
-        response = '<STATE>'
+        # MSG = CMD;tipoNodo_nroNodo;timestamp;job_id
+        # EJ: READ;joiner_3;20191201312312;job_id
+        params = msg.decode().split(';')
+        storageShard = self.getStorageShard(params[3])
+        job_id = params[3]
+        filename = params[1]
+        filePath = BASE_PATH + str(storageShard) + "/" +str(job_id) + "/" + str(filename)
+
+        f = os.open(filePath, "r")
+        contents = f.read()
+        f.close()
+        
+        response = contents
         self.output_queue.publish(response)
+
+    def getStorageShard(self, id):
+        return id % 2
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
