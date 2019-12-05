@@ -10,7 +10,7 @@ class RabbitMQQueue:
     def __init__(self, exchange, exchange_type='fanout', consumer=False, exclusive=False, queue_name='', routing_keys=[None]):
         self.thread_stop = True
         self.thread = None
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=HOST))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=HOST, heartbeat=0))
         self.channel = connection.channel()
 
         self.exchange = exchange
@@ -28,12 +28,13 @@ class RabbitMQQueue:
         self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=body,
                                    properties=pika.BasicProperties(delivery_mode=2,))
 
-    def consume(self, callback):
-        self.tag = self.channel.basic_consume(queue=self.queue_name, auto_ack=True,
-                                              on_message_callback=callback)
+    def consume(self, callback, auto_ack=False):
+        self.channel.basic_qos(prefetch_count=1)
+        self.tag = self.channel.basic_consume(queue=self.queue_name, auto_ack=auto_ack,
+                    on_message_callback=callback)
         self.channel.start_consuming()
 
-    def async_consume(self, callback):
+    def async_consume(self, callback, auto_ack=False):
         """Start a thread and consume messages there.
         Invariant: no more than one thread is consuming in an object
         instance."""
@@ -53,7 +54,8 @@ class RabbitMQQueue:
             #    self.channel.basic_cancel(self.tag)
             #    exit
 
-        self.thread = threading.Thread(target=self.consume, args=(wrapped_callback,))
+        self.thread = threading.Thread(target=self.consume, args=(wrapped_callback,),
+                kwargs={"auto_ack":auto_ack})
         self.thread.start()
 
     def cancel(self):

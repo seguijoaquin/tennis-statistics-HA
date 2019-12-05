@@ -1,61 +1,68 @@
 #!/usr/bin/env python3
 
-import pika
 import logging
-from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, MATCHES_EXCHANGE, PLAYERS_EXCHANGE
+from constants import END, CLOSE, OK, OUT_JOINER_EXCHANGE, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 from watchdog import heartbeatprocess
 
-END_ENCODED = END.encode()
-CLOSE_ENCODED = CLOSE.encode()
-MATCHES_QUEUE = 'matches_join'
+PLAYERS_DATA = 'atp_players.csv'
+FILTERED_QUEUE = 'matches_join'
 TERMINATOR_EXCHANGE = 'joiner_terminator'
 
 class Joiner:
     def __init__(self):
+        self.acked = set()
         self.players = {}
-        self.matches_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE, consumer=True,
-                                           queue_name=MATCHES_QUEUE)
-        self.players_queue = RabbitMQQueue(exchange=PLAYERS_EXCHANGE, consumer=True,
-                                           exclusive=True)
-        self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE)
+        self.matches_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct',
+                                           consumer=True, queue_name=FILTERED_QUEUE,
+                                           routing_keys=['joiner'])
+        self.out_queue = RabbitMQQueue(exchange=OUT_JOINER_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
     def run(self, _):
-        self.players_queue.consume(self.save_player)
+        self.save_players()
         self.matches_queue.consume(self.join)
 
-    def save_player(self, ch, method, properties, body):
-        logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.players_queue.cancel()
-            return
-
-        data = body.decode().split(',')
-        self.players[data[0]] = data[1:5]
+    def save_players(self):
+        with open(PLAYERS_DATA, 'r') as file:
+            file.readline()
+            for line in iter(file.readline, ''):
+                data = line.split(',')
+                self.players[data[0]] = data[1:5]
 
     def join(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.terminator_queue.publish(END)
-            return
-
-        if body == CLOSE_ENCODED:
-            self.terminator_queue.publish(OK)
-            self.matches_queue.cancel()
-            return
-
         data = body.decode().split(',')
-        winner_id = data[4]
-        loser_id = data[5]
-        data = [data[2]] + self.players[winner_id] + self.players[loser_id]
+        id = data[0]
+
+        if data[1] == END:
+            self.terminator_queue.publish(body)
+            logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        if data[1] == CLOSE:
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.matches_queue.publish(body)
+            logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        winner_id = data[5]
+        loser_id = data[6]
+        data = [data[0], data[3]] + self.players[winner_id] + self.players[loser_id]
         body = ','.join(data)
-        self.out_queue.publish(body)
+        self.out_queue.publish(body, 'filter')
+        self.out_queue.publish(body, 'calculator')
         logging.info('Sent %s' % body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
     hb = heartbeatprocess.HeartbeatProcess.setup(Joiner)
     hb.run()

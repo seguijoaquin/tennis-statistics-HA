@@ -31,11 +31,14 @@ class HeartbeatProcess:
         self.hostname = hostname
         self.metadata = metadata
         self.callback = callback
-        logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname))
-        logging.info("Instancing heartbeat process for hostname {}".format(hostname))
         self.exchange = RabbitMQQueue(
             exchange=HEARTBEAT_EXCHANGE,
             consumer=False, exchange_type="fanout")
+        logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname),
+            level = logging.INFO)
+
+        logging.info("Instancing heartbeat process for hostname {}".format(hostname))
+
 
     @staticmethod
     def setup(classname, *args, **kwargs):
@@ -54,6 +57,9 @@ class HeartbeatProcess:
         self.thread.start()
     def periodic_heartbeat(self):
         while True:
+            logging.debug("Sending heartbeat -- message is {}".format(
+                "heartbeat,{},{}".format(self.hostname, self.metadata)
+            ))
             self.exchange.publish("heartbeat,{},{}".format(self.hostname, self.metadata))
             time.sleep(HEARTBEAT_INTERVAL)
 

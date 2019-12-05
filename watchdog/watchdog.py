@@ -63,6 +63,7 @@ class WatchdogProcess:
         # TODO: special case for storage (master & replicas)
 
     def process_heartbeat(self, ch, method, properties, body):
+        logging.debug("Received heartbeat message is {}".format(str(body)))
         data = body.decode().split(',')
         recv_hostname = data[1]
         recv_metadata = data[2]
@@ -105,7 +106,7 @@ class WatchdogProcess:
         self.respawning[imgid] = False
 
     def launch_receiver_thread(self):
-        self.leader_queue.async_consume(self.process_heartbeat)
+        self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
 
     def launch_checker(self):
         while True:

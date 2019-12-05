@@ -6,13 +6,10 @@ from constants import END
 from rabbitmq_queue import RabbitMQQueue
 from watchdog import heartbeatprocess
 
-END_ENCODED = END.encode()
-
 class Accumulator:
     def __init__(self, routing_key, exchange, output_exchange):
         self.routing_key = routing_key
-        self.total = 0
-        self.amount = 0.0
+        self.values = {}
         self.in_queue = RabbitMQQueue(exchange=exchange, exchange_type='direct',
                                       consumer=True, exclusive=True,
                                       routing_keys=routing_key.split('-'))
@@ -23,20 +20,28 @@ class Accumulator:
 
     def add(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            body = ','.join([self.routing_key, str(self.amount), str(self.total)])
+        data = body.decode().split(',')
+        id = data[0]
+
+        if data[1] == END:
+            [amount, total] = self.values[id]
+            body = ','.join([id, self.routing_key, str(amount), str(total)])
             self.out_queue.publish(body)
-            self.in_queue.cancel()
+            logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
-        self.total += float(body.decode())
-        self.amount += 1
-        logging.debug('Current total: %f' % self.total)
-        logging.debug('Current amount: %f' % self.amount)
+        if not id in self.values:
+            self.values[id] = [0, 0]
+
+        self.values[id][0] += 1
+        logging.debug('Current amount: %f' % self.values[id][0])
+        self.values[id][1] += float(data[1])
+        logging.debug('Current total: %f' % self.values[id][1])
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
 
     routing_key = os.environ['ROUTING_KEY']
