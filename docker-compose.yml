@@ -245,7 +245,7 @@ services:
       dockerfile: storage/Dockerfile
     command: python3 -u ./storage.py
     volumes:
-      - ./storage/storage_1-volume:/storage
+      - ./storage/storage_1-volume:/data
     environment:
       PID: 1
     depends_on:
@@ -258,7 +258,7 @@ services:
       dockerfile: storage/Dockerfile
     command: python3 -u ./storage.py
     volumes:
-      - ./storage/storage_2-volume:/storage
+      - ./storage/storage_2-volume:/data
     environment:
       PID: 2
     depends_on:
@@ -271,7 +271,7 @@ services:
       dockerfile: storage/Dockerfile
     command: python3 -u ./storage.py
     volumes:
-      - ./storage/storage_3-volume:/storage
+      - ./storage/storage_3-volume:/data
     environment:
       PID: 3
     depends_on:
