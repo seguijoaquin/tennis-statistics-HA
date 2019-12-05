@@ -83,7 +83,7 @@ class ElectableProcess:
 
         logging.info("Consuming from queue")
 
-        self.process_queue.async_consume(self.process_message)
+        self.process_queue.async_consume(self.process_message, auto_ack=True)
 
         logging.info("Sleeping for {}s".format(TIMEOUT_ANSWER))
         time.sleep(TIMEOUT_ANSWER)
@@ -136,7 +136,7 @@ class ElectableProcess:
         # this one just wakes up every fraction of a second updating
         # the count
         self.last_heartbeat = time.time() - 0.01
-        self.leader_queue.async_consume(self.process_heartbeat)
+        self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
         diff = time.time() - self.last_heartbeat
 
         while diff < TIMEOUT_HEARTBEAT:
