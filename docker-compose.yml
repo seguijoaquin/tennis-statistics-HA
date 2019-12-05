@@ -10,234 +10,234 @@ services:
       timeout: 15s
       retries: 10
 
-  # surface_dispatcher:
-  #   build:
-  #     context: .
-  #     dockerfile: surface_dispatcher/Dockerfile
-  #   command: python3 -u ./surface_dispatcher.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # surface_dispatcher_terminator:
-  #   build:
-  #     context: .
-  #     dockerfile: terminator/Dockerfile
-  #   environment:
-  #     PROCESSES_NUMBER: ${SURFACE_DISPATCHERS_NUMBER}
-  #     IN_EXCHANGE: dispatcher_terminator
-  #     GROUP_EXCHANGE: matches
-  #     NEXT_EXCHANGE: surfaces
-  #     NEXT_EXCHANGE_TYPE: direct
-  #     NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
-  #   command: python3 -u ./terminator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # hard_accumulator:
-  #   build:
-  #     context: .
-  #     dockerfile: accumulator/Dockerfile
-  #   environment:
-  #     ROUTING_KEY: Hard
-  #     EXCHANGE: surfaces
-  #     OUTPUT_EXCHANGE: surface_values
-  #   command: python3 -u ./accumulator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # clay_accumulator:
-  #   build:
-  #     context: .
-  #     dockerfile: accumulator/Dockerfile
-  #   environment:
-  #     ROUTING_KEY: Clay
-  #     EXCHANGE: surfaces
-  #     OUTPUT_EXCHANGE: surface_values
-  #   command: python3 -u ./accumulator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # grass_carpet_accumulator:
-  #   build:
-  #     context: .
-  #     dockerfile: accumulator/Dockerfile
-  #   environment:
-  #     ROUTING_KEY: Grass-Carpet
-  #     EXCHANGE: surfaces
-  #     OUTPUT_EXCHANGE: surface_values
-  #   command: python3 -u ./accumulator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # average_calculator:
-  #   build:
-  #     context: .
-  #     dockerfile: average_calculator/Dockerfile
-  #   command: python3 -u ./average_calculator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # joiner:
-  #   build:
-  #     context: .
-  #     dockerfile: joiner/Dockerfile
-  #   command: python3 -u ./joiner.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # joiner_terminator:
-  #   build:
-  #     context: .
-  #     dockerfile: terminator/Dockerfile
-  #   environment:
-  #     PROCESSES_NUMBER: ${JOINERS_NUMBER}
-  #     IN_EXCHANGE: joiner_terminator
-  #     GROUP_EXCHANGE: matches
-  #     NEXT_EXCHANGE: joined
-  #     NEXT_EXCHANGE_TYPE: fanout
-  #     NEXT_ROUTING_KEYS: ''
-  #   command: python3 -u ./terminator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # age_calculator:
-  #   build:
-  #     context: .
-  #     dockerfile: age_calculator/Dockerfile
-  #   command: python3 -u ./age_calculator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # age_calculator_terminator:
-  #   build:
-  #     context: .
-  #     dockerfile: terminator/Dockerfile
-  #   environment:
-  #     PROCESSES_NUMBER: ${AGE_CALCULATORS_NUMBER}
-  #     IN_EXCHANGE: calculator_terminator
-  #     GROUP_EXCHANGE: joined
-  #     NEXT_EXCHANGE: player_age
-  #     NEXT_EXCHANGE_TYPE: fanout
-  #     NEXT_ROUTING_KEYS: ''
-  #   command: python3 -u ./terminator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # age_difference_filter:
-  #   build:
-  #     context: .
-  #     dockerfile: age_difference_filter/Dockerfile
-  #   command: python3 -u ./age_difference_filter.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # age_difference_filter_terminator:
-  #   build:
-  #     context: .
-  #     dockerfile: terminator/Dockerfile
-  #   environment:
-  #     PROCESSES_NUMBER: ${AGE_DIFFERENCE_FILTERS_NUMBER}
-  #     IN_EXCHANGE: age_filter_terminator
-  #     GROUP_EXCHANGE: player_age
-  #     NEXT_EXCHANGE: database
-  #     NEXT_EXCHANGE_TYPE: direct
-  #     NEXT_ROUTING_KEYS: age
-  #   command: python3 -u ./terminator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # different_hands_filter:
-  #   build:
-  #     context: .
-  #     dockerfile: different_hands_filter/Dockerfile
-  #   command: python3 -u ./different_hands_filter.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # different_hands_filter_terminator:
-  #   build:
-  #     context: .
-  #     dockerfile: terminator/Dockerfile
-  #   environment:
-  #     PROCESSES_NUMBER: ${DIFFERENT_HANDS_FILTERS_NUMBER}
-  #     IN_EXCHANGE: hands_filter_terminator
-  #     GROUP_EXCHANGE: joined
-  #     NEXT_EXCHANGE: hands
-  #     NEXT_EXCHANGE_TYPE: direct
-  #     NEXT_ROUTING_KEYS: R-L-U
-  #   command: python3 -u ./terminator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # right_accumulator:
-  #   build:
-  #     context: .
-  #     dockerfile: accumulator/Dockerfile
-  #   environment:
-  #     ROUTING_KEY: R
-  #     EXCHANGE: hands
-  #     OUTPUT_EXCHANGE: hands_values
-  #   command: python3 -u ./accumulator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # left_accumulator:
-  #   build:
-  #     context: .
-  #     dockerfile: accumulator/Dockerfile
-  #   environment:
-  #     ROUTING_KEY: L-U
-  #     EXCHANGE: hands
-  #     OUTPUT_EXCHANGE: hands_values
-  #   command: python3 -u ./accumulator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # percentage_calculator:
-  #   build:
-  #     context: .
-  #     dockerfile: percentage_calculator/Dockerfile
-  #   command: python3 -u ./percentage_calculator.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #
-  # client:
-  #   build:
-  #     context: .
-  #     dockerfile: client/Dockerfile
-  #   command: python3 -u ./client.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   depends_on:
-  #     - joiner
-  #     - surface_dispatcher
-  #
-  # database:
-  #   build:
-  #     context: .
-  #     dockerfile: database/Dockerfile
-  #   command: python3 -u ./database.py
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
+  surface_dispatcher:
+    build:
+      context: .
+      dockerfile: surface_dispatcher/Dockerfile
+    command: python3 -u ./surface_dispatcher.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  surface_dispatcher_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${SURFACE_DISPATCHERS_NUMBER}
+      IN_EXCHANGE: dispatcher_terminator
+      GROUP_EXCHANGE: matches
+      NEXT_EXCHANGE: surfaces
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  hard_accumulator:
+    build:
+      context: .
+      dockerfile: accumulator/Dockerfile
+    environment:
+      ROUTING_KEY: Hard
+      EXCHANGE: surfaces
+      OUTPUT_EXCHANGE: surface_values
+    command: python3 -u ./accumulator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  clay_accumulator:
+    build:
+      context: .
+      dockerfile: accumulator/Dockerfile
+    environment:
+      ROUTING_KEY: Clay
+      EXCHANGE: surfaces
+      OUTPUT_EXCHANGE: surface_values
+    command: python3 -u ./accumulator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  grass_carpet_accumulator:
+    build:
+      context: .
+      dockerfile: accumulator/Dockerfile
+    environment:
+      ROUTING_KEY: Grass-Carpet
+      EXCHANGE: surfaces
+      OUTPUT_EXCHANGE: surface_values
+    command: python3 -u ./accumulator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  average_calculator:
+    build:
+      context: .
+      dockerfile: average_calculator/Dockerfile
+    command: python3 -u ./average_calculator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  joiner:
+    build:
+      context: .
+      dockerfile: joiner/Dockerfile
+    command: python3 -u ./joiner.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  joiner_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${JOINERS_NUMBER}
+      IN_EXCHANGE: joiner_terminator
+      GROUP_EXCHANGE: matches
+      NEXT_EXCHANGE: joined
+      NEXT_EXCHANGE_TYPE: fanout
+      NEXT_ROUTING_KEYS: ''
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  age_calculator:
+    build:
+      context: .
+      dockerfile: age_calculator/Dockerfile
+    command: python3 -u ./age_calculator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  age_calculator_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${AGE_CALCULATORS_NUMBER}
+      IN_EXCHANGE: calculator_terminator
+      GROUP_EXCHANGE: joined
+      NEXT_EXCHANGE: player_age
+      NEXT_EXCHANGE_TYPE: fanout
+      NEXT_ROUTING_KEYS: ''
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  age_difference_filter:
+    build:
+      context: .
+      dockerfile: age_difference_filter/Dockerfile
+    command: python3 -u ./age_difference_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  age_difference_filter_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${AGE_DIFFERENCE_FILTERS_NUMBER}
+      IN_EXCHANGE: age_filter_terminator
+      GROUP_EXCHANGE: player_age
+      NEXT_EXCHANGE: database
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: age
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  different_hands_filter:
+    build:
+      context: .
+      dockerfile: different_hands_filter/Dockerfile
+    command: python3 -u ./different_hands_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  different_hands_filter_terminator:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: ${DIFFERENT_HANDS_FILTERS_NUMBER}
+      IN_EXCHANGE: hands_filter_terminator
+      GROUP_EXCHANGE: joined
+      NEXT_EXCHANGE: hands
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: R-L-U
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  right_accumulator:
+    build:
+      context: .
+      dockerfile: accumulator/Dockerfile
+    environment:
+      ROUTING_KEY: R
+      EXCHANGE: hands
+      OUTPUT_EXCHANGE: hands_values
+    command: python3 -u ./accumulator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  left_accumulator:
+    build:
+      context: .
+      dockerfile: accumulator/Dockerfile
+    environment:
+      ROUTING_KEY: L-U
+      EXCHANGE: hands
+      OUTPUT_EXCHANGE: hands_values
+    command: python3 -u ./accumulator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  percentage_calculator:
+    build:
+      context: .
+      dockerfile: percentage_calculator/Dockerfile
+    command: python3 -u ./percentage_calculator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    command: python3 -u ./client.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    depends_on:
+      - joiner
+      - surface_dispatcher
+  
+  database:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    command: python3 -u ./database.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   storage_1:
     build:
