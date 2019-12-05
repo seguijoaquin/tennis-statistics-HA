@@ -201,7 +201,7 @@ services:
       dockerfile: terminator/Dockerfile
     environment:
       PROCESSES_NUMBER: 1
-      IN_EXCHANGE: age_filter_terminatont_har
+      IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
       GROUP_EXCHANGE_TYPE: fanout
       GROUP_ROUTING_KEY: ''

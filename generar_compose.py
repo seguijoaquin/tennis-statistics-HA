@@ -212,7 +212,7 @@ templates = {
       dockerfile: terminator/Dockerfile
     environment:
       PROCESSES_NUMBER: {AGE_DIFFERENCE_FILTERS_NUMBER}
-      IN_EXCHANGE: age_filter_terminatont_har
+      IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
       GROUP_EXCHANGE_TYPE: fanout
       GROUP_ROUTING_KEY: ''

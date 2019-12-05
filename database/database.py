@@ -31,9 +31,13 @@ class Database:
                 return
 
             for filename in FILES:
-                file = open(filename + id, 'r')
-                response = file.read()
-                file.close()
+                try:
+                    file = open(filename + id, 'r')
+                    response = file.read()
+                    file.close()
+                except FileNotFoundError:
+                    response = '%s: No results' % filename
+
                 out_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + id)
                 out_queue.publish(response)
                 logging.info('Sent %s' % response)
@@ -47,7 +51,7 @@ class Database:
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        level=logging.ERROR)
+                        level=logging.INFO)
 
     hb = heartbeatprocess.HeartbeatProcess.setup(Database)
     hb.run()
