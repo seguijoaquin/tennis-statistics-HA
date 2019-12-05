@@ -136,7 +136,17 @@ _watchdog_.
 
 ### Esquema de multiprocesamiento
 
-Comentar cómo se hizo
+Para poder implementar un esquema de multiprocesamiento se optó por identificar 
+a cada cliente que ejecuta una consulta con un *ID* único. Este *ID* es
+provisto por el cliente y representa una consulta de un cliente en particular, 
+y el mismo se va propagando por todo el pipeline de ejecución.
+Por cada línea procesada para cada ejecución, se concatena este *ID* del cliente
+a la información a calcular (junto con el intervalo de fechas). De esta forma,
+la información sigue su camino sin mezclarse entre consultas.
+Una vez lanzada la consulta, cada cliente queda esperando la respuesta en una cola
+cuyo nombre contiene ese *ID* único.
+
+![](diagramas/activities_multiprocessing.png)
 
 ### Tolerancia a fallos
 
@@ -265,9 +275,43 @@ A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
 ![](diagramas/despliegue.png)
 
+## Hipótesis y Restricciones
+
+Se tomaron las siguientes hipótesis durante el diseño:
+
+ - Siempre que el *Watchdog* quiere matar a una instancia, puede matarla. 
+ - No existen particiones en la red.
+ - Los *ID* son generados por cada cliente. No existen dos *ID* iguales.
+ - Eventualmente una instancia de un filtro se puede levantar y/o las colas tienen tamaño infinito de buffer.
+ - Todo nodo de *Storage* puede ser iniciado. No hay fallas de hardware de discos en ningún nodo de *Storage*.
+
+ ## Criterios de aceptación
+
+ Los criterios de aceptación acordados son los siguientes:
+ - Camino feliz
+    - Levantar el sistema con docker compose
+    - Demostrar que un job lanzado se ejecuta y se obtiene el resultado esperado
+ - Camino feliz con multiple jobs
+    - Al menos dos jobs corriendo en paralelo
+    - Las respuestas a cada job dan el resultado esperado
+    - El sistema sigue prendido
+ - Prueba de carga
+    - Un job sólo utilizando un archivo de > 200 Mb
+    - Se debería ver si hay un cuello de botella revisando CPU consumido por los containers, colas de rabbit.
+ - Mejorar el caso anterior escalando la variable detectada como cuello de botella
+    - Con el sistema idle, se tira el Watchdog y se cambia el líder
+    - Es necesario saber quién es el líder, que se murió el líder, etc
+    - Es necesario mostrar la secuencia de mensajes entre los participantes para ver coherencia en leader election
+ - Dejamos corriendo la prueba de >200 Mb
+    - Se tira un líder, se degrada el sistema
+    - Se incorpora el sistema y sigue procesando
+    - Se obtiene el mismo resultado
+ - Se mata uno de los followers
+    - Necesitamos ver que al levantarse, se pueda hacer catch up
+
 ## Conclusiones
 
-Puntos de mejora
+
 
 ## Referencias
 
