@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 
-import pika
 import logging
-from constants import END, CLOSE, OK, MATCHES_EXCHANGE
+from constants import END, CLOSE, OK, FILTERED_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 from watchdog import heartbeatprocess
 
 SURFACES = ['Hard', 'Clay', 'Carpet', 'Grass']
-END_ENCODED = END.encode()
-CLOSE_ENCODED = CLOSE.encode()
 SURFACE_EXCHANGE = 'surfaces'
-MATCHES_QUEUE = 'matches_surface'
+FILTERED_QUEUE = 'matches_surface'
 TERMINATOR_EXCHANGE = 'dispatcher_terminator'
 
 class SurfaceDispatcher:
     def __init__(self):
-        self.in_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE, consumer=True, queue_name=MATCHES_QUEUE)
+        self.acked = set()
+        self.in_queue = RabbitMQQueue(exchange=FILTERED_EXCHANGE, exchange_type='direct',
+                                      consumer=True, queue_name=FILTERED_QUEUE,
+                                      routing_keys=['dispatcher'])
         self.out_queue = RabbitMQQueue(exchange=SURFACE_EXCHANGE, exchange_type='direct')
         self.terminator_queue = RabbitMQQueue(exchange=TERMINATOR_EXCHANGE)
 
@@ -24,28 +24,40 @@ class SurfaceDispatcher:
 
     def dispatch(self, ch, method, properties, body):
         logging.info('Received %r' % body)
-        if body == END_ENCODED:
-            self.terminator_queue.publish(END)
-            return
-
-        if body == CLOSE_ENCODED:
-            self.terminator_queue.publish(OK)
-            self.in_queue.cancel()
-            return
-
         data = body.decode().split(',')
-        surface = data[3]
-        minutes = data[9]
+        id = data[0]
+
+        if data[1] == END:
+            self.terminator_queue.publish(body)
+            logging.info('Sent %r' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        if data[1] == CLOSE:
+            if not id in self.acked:
+                body = ','.join([id, OK])
+                self.terminator_queue.publish(body)
+                self.acked.add(id)
+            else:
+                self.in_queue.publish(body)
+            logging.info('Sent %s' % body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        surface = data[4]
+        minutes = data[10]
 
         if minutes == '' or surface in ('', 'None'):
+            ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
-        self.out_queue.publish(minutes, surface)
-        logging.info('Sent %s minutes to %s accumulator' % (minutes, surface))
+        body = ','.join([id, minutes])
+        self.out_queue.publish(body, surface)
+        logging.info('Sent %s to %s accumulator' % (body, surface))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.ERROR)
 
     hb = heartbeatprocess.HeartbeatProcess.setup(SurfaceDispatcher)

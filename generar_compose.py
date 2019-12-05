@@ -4,9 +4,42 @@ import sys
 import yaml
 import os
 
-basedirname = os.path.split(os.getcwd())[-1] # docker-compose image prefix
+# basedirname = os.path.split(os.getcwd())[-1] # docker-compose image prefix
+basedirname = os.path.split(os.getcwd())[-1].lower().rstrip()
 
 templates = {
+    "date_filter": """
+  date_filter_{0}:
+    build:
+      context: .
+      dockerfile: date_filter/Dockerfile
+    environment:
+      HOSTNAME: date_filter_{0}
+    command: python3 -u ./date_filter.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+""",
+    "date_filter_terminator": """
+  date_filter_terminator_{0}:
+    build:
+      context: .
+      dockerfile: terminator/Dockerfile
+    environment:
+      PROCESSES_NUMBER: {DATE_FILTERS_NUMBER}
+      IN_EXCHANGE: date_filter_terminator
+      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE_TYPE: fanout
+      GROUP_ROUTING_KEY: ''
+      NEXT_EXCHANGE: filtered
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: dispatcher-joiner
+      HOSTNAME: date_filter_terminator_{0}
+    command: python3 -u ./terminator.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+""",
     "surface_dispatcher": """
   surface_dispatcher_{0}:
     build:
@@ -27,10 +60,12 @@ templates = {
     environment:
       PROCESSES_NUMBER: {SURFACE_DISPATCHERS_NUMBER}
       IN_EXCHANGE: dispatcher_terminator
-      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE: filtered
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: dispatcher
       NEXT_EXCHANGE: surfaces
       NEXT_EXCHANGE_TYPE: direct
-      NEXT_ROUTING_KEYS: Hard-Clay-Carpet-Grass
+      NEXT_ROUTING_KEYS: Hard-Clay-Grass
       HOSTNAME: surface_dispatcher_terminator_{0}
     command: python3 -u ./terminator.py
     depends_on:
@@ -114,10 +149,12 @@ templates = {
     environment:
       PROCESSES_NUMBER: {JOINERS_NUMBER}
       IN_EXCHANGE: joiner_terminator
-      GROUP_EXCHANGE: matches
+      GROUP_EXCHANGE: filtered
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: joiner
       NEXT_EXCHANGE: joined
-      NEXT_EXCHANGE_TYPE: fanout
-      NEXT_ROUTING_KEYS: ''
+      NEXT_EXCHANGE_TYPE: direct
+      NEXT_ROUTING_KEYS: filter-calculator
       HOSTNAME: joiner_terminator_{0}
     command: python3 -u ./terminator.py
     depends_on:
@@ -145,6 +182,8 @@ templates = {
       PROCESSES_NUMBER: {AGE_CALCULATORS_NUMBER}
       IN_EXCHANGE: calculator_terminator
       GROUP_EXCHANGE: joined
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: calculator
       NEXT_EXCHANGE: player_age
       NEXT_EXCHANGE_TYPE: fanout
       NEXT_ROUTING_KEYS: ''
@@ -175,6 +214,8 @@ templates = {
       PROCESSES_NUMBER: {AGE_DIFFERENCE_FILTERS_NUMBER}
       IN_EXCHANGE: age_filter_terminator
       GROUP_EXCHANGE: player_age
+      GROUP_EXCHANGE_TYPE: fanout
+      GROUP_ROUTING_KEY: ''
       NEXT_EXCHANGE: database
       NEXT_EXCHANGE_TYPE: direct
       NEXT_ROUTING_KEYS: age
@@ -205,9 +246,11 @@ templates = {
       PROCESSES_NUMBER: {DIFFERENT_HANDS_FILTERS_NUMBER}
       IN_EXCHANGE: hands_filter_terminator
       GROUP_EXCHANGE: joined
+      GROUP_EXCHANGE_TYPE: direct
+      GROUP_ROUTING_KEY: filter
       NEXT_EXCHANGE: hands
       NEXT_EXCHANGE_TYPE: direct
-      NEXT_ROUTING_KEYS: R-L-U
+      NEXT_ROUTING_KEYS: R-L
       HOSTNAME: different_hands_filter_terminator_{0}
     command: python3 -u ./terminator.py
     depends_on:
@@ -261,15 +304,11 @@ templates = {
     build:
       context: .
       dockerfile: client/Dockerfile
-    command: python3 -u ./client.py
     environment:
       HOSTNAME: client_{0}
     depends_on:
       rabbitmq:
         condition: service_healthy
-    depends_on:
-      - joiner_0
-      - surface_dispatcher_0
 """,
     "database":"""
   database_{0}:
@@ -327,6 +366,7 @@ if __name__ == "__main__":
             for i in range(amount):
                 f.write(templates[key].format(i,
                   basedirname=basedirname,
+                  DATE_FILTERS_NUMBER=cluster_config["date_filter_terminator"],
                   SURFACE_DISPATCHERS_NUMBER=cluster_config["surface_dispatcher"],
                   AGE_CALCULATORS_NUMBER=cluster_config["age_calculator"],
                   AGE_DIFFERENCE_FILTERS_NUMBER=cluster_config["age_difference_filter"],

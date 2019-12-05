@@ -12,7 +12,12 @@ HEARTBEAT_TIMEOUT = 1.2
 STOP_SLEEP = 5 # time to wait after stopping a container
 START_SLEEP = 5 # time to wait after starting a container to check
 STARTING_TOLERANCE = 10 # tolerance for the first timeout
+CLUSTER_CONFIG_YML = "cluster_config.yml"
 
+def load_yaml():
+    import yaml
+    with open(CLUSTER_CONFIG_YML, 'r') as f:
+            return yaml.safe_load(f)
 class WatchdogProcess:
     """This process receives heartbeats from other containers
     and launches new instances when it detects that a process
@@ -41,9 +46,7 @@ class WatchdogProcess:
             exchange=EXCHANGE, consumer=True)
 
     def load_default_config(self):
-        import yaml
-        with open("cluster_config.yml", 'r') as f:
-            self.default_config = yaml.safe_load(f)
+        self.default_config = load_yaml()
 
         self.last_timeout = {}
         for key in self.default_config.keys():
@@ -60,6 +63,7 @@ class WatchdogProcess:
         # TODO: special case for storage (master & replicas)
 
     def process_heartbeat(self, ch, method, properties, body):
+        logging.debug("Received heartbeat message is {}".format(str(body)))
         data = body.decode().split(',')
         recv_hostname = data[1]
         recv_metadata = data[2]
@@ -102,7 +106,7 @@ class WatchdogProcess:
         self.respawning[imgid] = False
 
     def launch_receiver_thread(self):
-        self.leader_queue.async_consume(self.process_heartbeat)
+        self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
 
     def launch_checker(self):
         while True:
@@ -110,6 +114,7 @@ class WatchdogProcess:
             current_time = time.time()
             for hostname, last_heartbeat in self.last_timeout.items():
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
+                    logging.info("Detected timeout of hostname {}".format(hostname))
                     self.respawning[hostname] = True
                     thread = threading.Thread(target=self.respawn_container, args=(hostname,))
                     thread.start()
@@ -119,19 +124,21 @@ class WatchdogProcess:
 if __name__ == '__main__':
     from leader import ElectableProcess
     from heartbeatprocess import HeartbeatProcess
-    logging.basicConfig(format='%(asctime)s %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     logging.info("Started watchdog!")
     hostname = os.getenv("HOSTNAME", "-1")
-    pid = int(os.getenv("PID", 1))
+    pid = int(os.getenv("PID", -1))
     logging.info("Hostname is: {}, PID is {}".format(hostname, pid))
 
-    wp = WatchdogProcess(hostname)
-    pidlist = [n for n in range(wp.default_config["watchdog"])
+    config = load_yaml()
+    pidlist = [n for n in range(config["watchdog"])
         if n != pid]
+
+    def start_watchdog():
+        wp = WatchdogProcess(hostname)
+        wp.run()
 
     #proc = ElectableProcess(pid, pidlist, wp.run)
     hb = HeartbeatProcess.setup(ElectableProcess,
-            pid, pidlist, wp.run)
+            pid, pidlist, start_watchdog)
     hb.run()
