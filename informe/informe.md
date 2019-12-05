@@ -73,14 +73,14 @@ y marcamos puntos de mejora.
 
 ### Casos de Uso
 
-El caso de uso del sistema es uno sólo. Consiste únicamente en solicitar un 
-reporte de información. El usuario lanzará una instrucción a la aplicación para 
-que pueda procesar la información sobre los partidos de tenis y generar el 
-reporte con la estadística requerida por los objetivos mencionados anteriormente. 
+El caso de uso del sistema es uno sólo. Consiste únicamente en solicitar un
+reporte de información. El usuario lanzará una instrucción a la aplicación para
+que pueda procesar la información sobre los partidos de tenis y generar el
+reporte con la estadística requerida por los objetivos mencionados anteriormente.
 Dicha instrucción podrá o no indicar un período de tiempo consecutivo haciendo
 que el análisis de la información sea únicamente dentro de ese período establecido
 por el cliente. En caso de no hacerlo en forma explícita, se analizarán toda la
-información, independientemente del período dentro del cuál se encuentre. 
+información, independientemente del período dentro del cuál se encuentre.
 De esta forma, el diagrama de casos de uso del sistema sería el siguiente:
 
 ![](diagramas/use_cases.png)
@@ -264,10 +264,6 @@ es el _storage master_.
 A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
 ![](diagramas/despliegue.png)
-
-## Escenarios
-
-Comentar los casos de prueba que tenemos en el doc de aceptación
 
 ## Conclusiones
 
