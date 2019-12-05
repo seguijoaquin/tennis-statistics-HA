@@ -69,6 +69,21 @@ unidades de cálculo ligadas al negocio, más otros procesos de soporte. En este
 informe detallamos las decisiones detrás del diseño, documentamos la implementación
 y marcamos puntos de mejora.
 
+## Escenarios
+
+### Casos de Uso
+
+El caso de uso del sistema es uno sólo. Consiste únicamente en solicitar un 
+reporte de información. El usuario lanzará una instrucción a la aplicación para 
+que pueda procesar la información sobre los partidos de tenis y generar el 
+reporte con la estadística requerida por los objetivos mencionados anteriormente. 
+Dicha instrucción podrá o no indicar un período de tiempo consecutivo haciendo
+que el análisis de la información sea únicamente dentro de ese período establecido
+por el cliente. En caso de no hacerlo en forma explícita, se analizarán toda la
+información, independientemente del período dentro del cuál se encuentre. 
+De esta forma, el diagrama de casos de uso del sistema sería el siguiente:
+
+![](diagramas/use_cases.png)
 
 
 ## Vista lógica
