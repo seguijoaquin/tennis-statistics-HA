@@ -3,6 +3,7 @@
 import os
 import logging
 import pathlib
+from glob import glob
 from multiprocessing import Process
 from rabbitmq_queue import RabbitMQQueue
 
@@ -66,11 +67,11 @@ class Storage:
         # EJ: WRITE;joiner_3;93243;10,11,12,13;20191206113249;123123
         params = state.split(';')
         storageShard = self.getStorageShard(params[5]) # Shard storage data by job_id into 2 clusters
-        # path = "/storage/shard_id/job_id/"
-        path = BASE_PATH + str(storageShard) + "/" + str(params[5]) + "/"
+        # path = "/storage/shard_id/nodeType_nodeNumber/"
+        path = BASE_PATH + str(storageShard) + "/" + str(params[1]) + "/"
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
-        # filename = "nodeType_nodeNumber"
-        filename = str(params[1])
+        # filename = "job_id"
+        filename = str(params[5]) + ".state"
         f = open(path + filename, "w+") # Truncates previous state & writes
         f.write(str(state))
         f.close()
@@ -87,21 +88,20 @@ class Storage:
         return False
 
     def processRead(self, msg):
-        # MSG = CMD;tipoNodo_nroNodo;timestamp;job_id
-        # EJ: READ;joiner_3;20191201312312;123123
+        # MSG = CMD;tipoNodo_nroNodo;timestamp
+        # EJ: READ;joiner_3;20191201312312
         params = msg.decode().split(';')
         storageShard = self.getStorageShard(params[3])
-        job_id = params[3]
         filename = params[1]
-        filePath = BASE_PATH + str(storageShard) + "/" +str(job_id) + "/" + str(filename)
+        filePath = BASE_PATH + str(storageShard) + "/" +str(filename) + "/"
 
-        f = open(filePath, 'r')
-        contents = f.read()
-        f.close()
-        
-        response = contents
-        client_routing_key = str(job_id) + str(filename)
-        self.output_queue.publish(response, client_routing_key)
+        for file in glob(filePath + "*.state"):
+            with open(filename, 'r') as file:
+                contents = file.read()
+                client_routing_key = str(filename)
+                self.output_queue.publish(contents, client_routing_key)
+
+        self.output_queue.publish('END', client_routing_key)
 
     def getStorageShard(self, id):
         return int(id) % 2
