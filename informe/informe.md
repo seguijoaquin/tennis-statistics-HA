@@ -87,7 +87,34 @@ líneas filtradas, se divide el procesamiento en 3 ramas:
 
 ## Vista de desarrollo
 
-Diagrama de paquetes
+En el siguiente diagrama de paquetes podemos ver cómo está organizado el sistema.
+Fundamentalmente, todos los paquetes se conectan con el _middleware_.  Vemos
+que los paquetes incluyen los distintos tipos de nodos de lógica de
+negocio (`accumulator`, `age_calculator`, `average_calculator`,
+`percentage_calculator`, `different_hands_filter`, `surface_dispatcher`,
+`age_calculator`, `age_difference_filter` y `joiner`). También están
+los paquetes que dan soporte a la aplicación:
+
+* `heartbeat` es una clase que le agrega a un _entry point_ la funcionalidad
+de _heartbeat_.
+* `leader` es una clase que ejecuta cierta lógica sólo cuando un proceso
+es elegido líder.
+* `watchdog` es el nodo que escucha los _heartbeats_ y levanta los procesos
+que no han emitido uno en un tiempo dado.
+* `storage` es el nodo que puede funcionar como maestro o esclavo y permite
+la persistencia de los datos ante fallas del sistema.
+
+
+![](diagramas/paquetes.png)
+
+Además,
+todos los nodos incluyen al _heartbeat_, excepto el cliente. La lógica es la siguiente:
+el punto de entrada de cada proceso es el _heartbeat process_ y a éste se le
+pasa la información del _entry point_ de la lógica del negocio. Un esquema similar
+sucede con el algoritmo Bully, que está en el paquete _leader_. De esta manera
+se pueden encadenar los comportamientos, tal que _heartbeat process_ dispare
+la lógica de _electable process_ y que éste finalmente dispare la lógica de
+_watchdog_.
 
 
 ## Vista de proceso
@@ -212,7 +239,16 @@ generación de un nuevo nodo maestro.
 
 ## Vista física
 
-Diagrama de despliegue
+En el siguiente diagrama de despliegue podemos ver un estado correcto del _deployment_
+de la aplicación. Marcamos en el diagrama la diferencia entre los roles que se
+cumplen en tiempo ejecución, como los nodos _followers_ y _leaders_, o _master_ y
+_slaves_. Inicialmente todos los procesos arrancan como _followers_ o _slaves_. Después
+de la primera elección un nodo es elegido _leader_ y éste luego puede definir quién
+es el _storage master_.
+
+A diferencia del TP2 también vemos que se aceptan múltiples clientes.
+
+![](diagramas/despliegue.png)
 
 ## Escenarios
 
