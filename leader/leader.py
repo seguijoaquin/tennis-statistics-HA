@@ -124,10 +124,6 @@ class ElectableProcess:
             self.leader_ex.publish("heartbeat")
             time.sleep(HEARTBEAT_INTERVAL)
 
-        self.logic_process.terminate()
-        self.start_election()
-
-
     def process_heartbeat(self, ch, method, properties, body):
         self.last_heartbeat = time.time()
 

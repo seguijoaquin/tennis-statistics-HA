@@ -10,9 +10,11 @@ EXCHANGE = "watchdogx"
 CHECK_INTERVAL = 1
 HEARTBEAT_TIMEOUT = 1.2
 STOP_SLEEP = 5 # time to wait after stopping a container
-START_SLEEP = 5 # time to wait after starting a container to check
+START_SLEEP = 5 # max time to wait after starting a container to check
 STARTING_TOLERANCE = 10 # tolerance for the first timeout
+POLL_INTERVAL = 1 # docker polling interval
 CLUSTER_CONFIG_YML = "cluster_config.yml"
+MAXFAILS = 3 # max times to reattempt an operation (e.g. docker cmd)
 
 def load_yaml():
     import yaml
@@ -74,12 +76,25 @@ class WatchdogProcess:
 
     def mkimgname(self, imgid):
         return "{}_{}_1".format(self.basedirname, imgid)
+
     def stop_container(self, imgid):
         imgid = self.mkimgname(imgid)
+        failed = 0
         result = subprocess.run(['docker', 'stop', "-t" ,"1", imgid],
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logging.info('Stop command executed. Result={}. Output={}. Error={}'.format(
             result.returncode, result.stdout, result.stderr))
+        while result.returncode != 0 and failed < MAXFAILED:
+            failed +=1
+            logging.error("Return code was not zero. Trying again.. ({}/{} attempts)".format(
+                failed, MAXFAILED
+            ))
+            result = subprocess.run(['docker', 'stop', "-t" ,"1", imgid],
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if failed >= MAXFAILED:
+            raise Exception("Surpassed maximum retries for docker stop")
+
 
     def launch_container(self, imgid):
         imgid = self.mkimgname(imgid)
@@ -97,12 +112,24 @@ class WatchdogProcess:
 
     def respawn_container(self, imgid):
         logging.info("RESPAWN_CONTAINER called({})".format(imgid))
-        self.stop_container(imgid)
-        time.sleep(STOP_SLEEP)
-        self.launch_container(imgid)
-        time.sleep(START_SLEEP)
-        if not self.container_is_running(imgid):
-            logging.warn("Image {} was started but was not found in ps!".format(imgid))
+        try:
+            self.stop_container(imgid)
+            time.sleep(STOP_SLEEP)
+            self.launch_container(imgid)
+            launched = time.time()
+            # poll to check if container is up
+            while time.time() - launched < START_SLEEP and not container_is_running(imgid):
+                time.sleep(POLL_INTERVAL)
+
+            if time.time() - launched > START_SLEEP:
+                raise Exception("Timeout while waiting for container {} to start".format(imgid))
+
+            # Container started, now we need to be tolerant
+            # for the first heartbeat, so:
+            self.last_timeout[imgid] = time.time() + STARTING_TOLERANCE
+
+        except Exception, e:
+            logging.error("Exception on respawn_container: "+str(e))
         self.respawning[imgid] = False
 
     def launch_receiver_thread(self):
