@@ -15,6 +15,8 @@ STARTING_TOLERANCE = 10 # tolerance for the first timeout
 POLL_INTERVAL = 1 # docker polling interval
 CLUSTER_CONFIG_YML = "cluster_config.yml"
 MAXFAILS = 3 # max times to reattempt an operation (e.g. docker cmd)
+MASTER_ROLE = "master"
+SLAVE_ROLE = "slave"
 
 def load_yaml():
     import yaml
@@ -58,11 +60,13 @@ class WatchdogProcess:
                 "{}_{}".format(key,i):time.time()+STARTING_TOLERANCE
                 for i in range(self.default_config[key])}
             self.last_timeout.update(structure_single_key)
-        #del self.last_timeout[self.hostname]
+            if key == "storage": # TODO
+                self.storage_roles = {k: SLAVE_ROLE for k in structure_single_key.keys()}
+                self.storage_master_heartbeat = 0 #instant timeout
+
         # Special structure to indicate that a container is being restarted and
         # should not be checked for timeouts.
         self.respawning = {k: False for k in self.last_timeout.keys()}
-        # TODO: special case for storage (master & replicas)
 
     def process_heartbeat(self, ch, method, properties, body):
         logging.debug("Received heartbeat message is {}".format(str(body)))
@@ -72,7 +76,10 @@ class WatchdogProcess:
 
         self.last_timeout[recv_hostname] = time.time()
 
-        # TODO: if hostname is compatible with storage then check the metadata
+        if recv_hostname.split("_")[0] == "storage":
+            self.storage_roles[recv_hostname] = recv_metadata
+            if self.storage_roles[recv_hostname] == MASTER_ROLE:
+                self.storage_master_heartbeat = self.last_timeout[recv_hostname]
 
     def mkimgname(self, imgid):
         return "{}_{}_1".format(self.basedirname, imgid)
@@ -135,6 +142,22 @@ class WatchdogProcess:
     def launch_receiver_thread(self):
         self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
 
+    def reassign_storage_master(self):
+        #TODO: what about the first time?all responding but no master => por esto el flag adicional y eso.
+
+        # setear el master como slave y agarrar un nodo vivo
+        current_time = time.time()
+        for storage_node in self.storage_roles.keys():
+            self.storage_roles[storage_node] = SLAVE_ROLE
+            if current_time - self.last_timeout[storage_node] < HEARTBEAT_TIMEOUT:
+                new_master = storage_node
+
+        # TODO: mandarle mensaje
+
+        while self.storage_roles[new_master] == SLAVE_ROLE:
+            time.sleep(POLL_INTERVAL)
+
+        self.reassigning = False
     def launch_checker(self):
         while True:
             #TODO: special case for storage master & replicas
@@ -143,9 +166,15 @@ class WatchdogProcess:
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
                     logging.info("Detected timeout of hostname {}".format(hostname))
                     self.respawning[hostname] = True
+
                     thread = threading.Thread(target=self.respawn_container, args=(hostname,))
                     thread.start()
                     current_time = time.time() #to prevent staleness
+
+                    # TODO: check if is storage master
+            if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
+                self.reassigning = True
+                self.reassign_storage_master() # thread and shit
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
