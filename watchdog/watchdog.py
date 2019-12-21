@@ -14,7 +14,7 @@ START_SLEEP = 5 # max time to wait after starting a container to check
 STARTING_TOLERANCE = 10 # tolerance for the first timeout
 POLL_INTERVAL = 1 # docker polling interval
 CLUSTER_CONFIG_YML = "cluster_config.yml"
-MAXFAILS = 3 # max times to reattempt an operation (e.g. docker cmd)
+MAXFAILED = 3 # max times to reattempt an operation (e.g. docker cmd)
 MASTER_ROLE = "master"
 SLAVE_ROLE = "slave"
 
@@ -34,6 +34,9 @@ class WatchdogProcess:
     def __init__(self, hostname):
         self.hostname = hostname
         self.basedirname  = os.getenv("BASEDIRNAME", "error")
+        self.to_start = []
+        self.to_stop = []
+        self.reassigning = False
         self.load_default_config()
 
     def run(self):
@@ -42,6 +45,8 @@ class WatchdogProcess:
         self.setup_queues()
         logging.info("Launching receiver thread")
         self.launch_receiver_thread()
+        logging.info("Launching spawner threads")
+        self.launch_spawner_threads()
         logging.info("Launching checker")
         self.launch_checker()
 
@@ -53,6 +58,7 @@ class WatchdogProcess:
         self.default_config = load_yaml()
 
         self.last_timeout = {}
+        self.storage_roles = {}
         for key in self.default_config.keys():
             if key == "client":
                 continue
@@ -61,9 +67,9 @@ class WatchdogProcess:
                 for i in range(self.default_config[key])}
             self.last_timeout.update(structure_single_key)
             if key == "storage": # TODO
-                self.storage_roles = {k: SLAVE_ROLE for k in structure_single_key.keys()}
-                self.storage_master_heartbeat = 0 #instant timeout
+                self.storage_roles.update({k: SLAVE_ROLE for k in structure_single_key.keys()})
 
+        self.storage_master_heartbeat = 0 # instant timeout
         # Special structure to indicate that a container is being restarted and
         # should not be checked for timeouts.
         self.respawning = {k: False for k in self.last_timeout.keys()}
@@ -117,27 +123,61 @@ class WatchdogProcess:
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return imgid in str(result.stdout)
 
-    def respawn_container(self, imgid):
-        logging.info("RESPAWN_CONTAINER called({})".format(imgid))
-        try:
-            self.stop_container(imgid)
-            time.sleep(STOP_SLEEP)
-            self.launch_container(imgid)
-            launched = time.time()
-            # poll to check if container is up
-            while time.time() - launched < START_SLEEP and not container_is_running(imgid):
+    def respawn_stop_loop(self):
+        """
+        This thread stops containers listed in self.to_pop
+        and sends them onto the respawn_start_thread via the
+        self.to_start list.
+        """
+        while True:
+            if len(self.to_stop) == 0:
                 time.sleep(POLL_INTERVAL)
+                continue
+            imgid = self.to_stop.pop()
+            try:
+                self.stop_container(imgid)
+                self.to_start.append(imgid)
+            except Exception as e:
+                # If we find an error stopping the container then we unmark
+                #it and hope next time there is no error.
+                logging.error("Exception on respawn_stop_thread: "+str(e))
+                self.respawning[imgid] = False
 
-            if time.time() - launched > START_SLEEP:
-                raise Exception("Timeout while waiting for container {} to start".format(imgid))
+    def respawn_start_loop(self):
+        """
+        This thread starts containers listed in self.to_start
+        after a START_SLEEP interval and removes the respawning flag.
+        The first heartbeat timeout is set with a STARTING_TOLERANCE
+        offset.
+        """
+        waiting = [] # internal list that we don't have race conditions on
+        while True:
+            current_time = time.time()
+            if len(self.to_start) == 0 and len(waiting) == 0:
+                time.sleep(POLL_INTERVAL)
+                continue
+            if len(self.to_start) > 0:
+                imgid = self.to_start.pop() #atomic
+                waiting.append((imgid, current_time + START_SLEEP))
+            # launch a container if we have passed the scheduled start time
+            for imgid, scheduled_time in waiting:
+                if scheduled_time <= current_time:
+                    try:
+                        self.launch_container(imgid)
+                    except Exception as e:
+                        logging.error("Exception on respawn_start_thread: "+str(e))
+                    finally:
+                        self.last_timeout[imgid] = time.time() + STARTING_TOLERANCE
+                        self.respawning[imgid] = False
+            # filter launched container
+            waiting = [(i,t) for i,t in waiting if current_time<t]
 
-            # Container started, now we need to be tolerant
-            # for the first heartbeat, so:
-            self.last_timeout[imgid] = time.time() + STARTING_TOLERANCE
+    def launch_spawner_threads(self):
+        respawn_start = threading.Thread(target=self.respawn_stop_loop)
+        respawn_start.start()
 
-        except Exception, e:
-            logging.error("Exception on respawn_container: "+str(e))
-        self.respawning[imgid] = False
+        respawn_stop = threading.Thread(target=self.respawn_start_loop)
+        respawn_stop.start()
 
     def launch_receiver_thread(self):
         self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
@@ -166,15 +206,11 @@ class WatchdogProcess:
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
                     logging.info("Detected timeout of hostname {}".format(hostname))
                     self.respawning[hostname] = True
+                    self.to_stop.append(hostname) # another thread reads this queue
 
-                    thread = threading.Thread(target=self.respawn_container, args=(hostname,))
-                    thread.start()
-                    current_time = time.time() #to prevent staleness
-
-                    # TODO: check if is storage master
-            if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
-                self.reassigning = True
-                self.reassign_storage_master() # thread and shit
+            #if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
+            #    self.reassigning = True
+            #    self.reassign_storage_master() # thread and shit
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
