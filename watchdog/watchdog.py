@@ -217,8 +217,9 @@ class WatchdogProcess:
         logging.info("Storage settings after reassigning: {}".format(self.storage_roles))
         self.reassigning = False
     def launch_checker(self):
+        i = 0
         while True:
-
+            i = (i+1) % 5
             current_time = time.time()
             for hostname, last_heartbeat in self.last_timeout.items():
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
@@ -230,7 +231,8 @@ class WatchdogProcess:
                 self.reassigning = True
                 reassign_thread = threading.Thread(target=self.reassign_storage_master)
                 reassign_thread.start()
-
+            if i == 1:
+                logging.info("Storage settings right now: {}".format(self.storage_roles))
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
