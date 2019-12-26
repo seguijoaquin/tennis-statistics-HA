@@ -52,9 +52,9 @@ class ElectableProcess:
             exchange=ELECTION_EXCHANGE, consumer=True, exchange_type="direct",
                 routing_keys=[str(self.pid)])
         self.leader_ex = RabbitMQQueue(
-            exchange=LEADER_EXCHANGE, consumer=False)
+            exchange=LEADER_EXCHANGE, consumer=False, durable=False)
         self.leader_queue = RabbitMQQueue(
-            exchange=LEADER_EXCHANGE, consumer=True)
+            exchange=LEADER_EXCHANGE, consumer=True, durable=False)
 
     def process_message(self, ch, method, properties, body):
         data = body.decode().split(',')

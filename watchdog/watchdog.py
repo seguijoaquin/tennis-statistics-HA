@@ -17,6 +17,7 @@ CLUSTER_CONFIG_YML = "cluster_config.yml"
 MAXFAILED = 3 # max times to reattempt an operation (e.g. docker cmd)
 MASTER_ROLE = "master"
 SLAVE_ROLE = "slave"
+NEW_MASTER_MSG = "M"
 
 def load_yaml():
     import yaml
@@ -52,7 +53,8 @@ class WatchdogProcess:
 
     def setup_queues(self):
         self.leader_queue = RabbitMQQueue(
-            exchange=EXCHANGE, consumer=True)
+            exchange=EXCHANGE, consumer=True, durable=False)
+        self.storage_exchange = RabbitMQQueue(exchange='storage_slave', consumer=False)
 
     def load_default_config(self):
         self.default_config = load_yaml()
@@ -183,24 +185,40 @@ class WatchdogProcess:
         self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
 
     def reassign_storage_master(self):
+        logging.info("Watchdog Leader: reassigning master")
         #TODO: what about the first time?all responding but no master => por esto el flag adicional y eso.
 
         # setear el master como slave y agarrar un nodo vivo
+        logging.info("Storage settings right now: {}".format(self.storage_roles))
         current_time = time.time()
         for storage_node in self.storage_roles.keys():
             self.storage_roles[storage_node] = SLAVE_ROLE
             if current_time - self.last_timeout[storage_node] < HEARTBEAT_TIMEOUT:
                 new_master = storage_node
 
-        # TODO: mandarle mensaje
+        logging.info("Watchdog Leader: new master should be {}, current role is {}".format(
+            new_master, self.storage_roles[new_master]
+        ))
 
+        self.storage_exchange.publish("{},{}".format(
+            NEW_MASTER_MSG,
+            new_master.split("_")[-1] # PID
+        ))
+
+        # wait until node has processed the message and changed roles
         while self.storage_roles[new_master] == SLAVE_ROLE:
+            logging.info("Watchdog Leader: waiting for {} to change role".format(new_master))
             time.sleep(POLL_INTERVAL)
 
+        logging.info("Watchdog Leader: {} has changed role to {}, moving away".format(
+            new_master,
+            self.storage_roles[new_master]
+        ))
+        logging.info("Storage settings after reassigning: {}".format(self.storage_roles))
         self.reassigning = False
     def launch_checker(self):
         while True:
-            #TODO: special case for storage master & replicas
+
             current_time = time.time()
             for hostname, last_heartbeat in self.last_timeout.items():
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
@@ -208,9 +226,11 @@ class WatchdogProcess:
                     self.respawning[hostname] = True
                     self.to_stop.append(hostname) # another thread reads this queue
 
-            #if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
-            #    self.reassigning = True
-            #    self.reassign_storage_master() # thread and shit
+            if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
+                self.reassigning = True
+                reassign_thread = threading.Thread(target=self.reassign_storage_master)
+                reassign_thread.start()
+
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':

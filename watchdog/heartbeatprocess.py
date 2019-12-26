@@ -33,7 +33,7 @@ class HeartbeatProcess:
         self.callback = callback
         self.exchange = RabbitMQQueue(
             exchange=HEARTBEAT_EXCHANGE,
-            consumer=False, exchange_type="fanout")
+            consumer=False, exchange_type="fanout", durable=False)
         logging.basicConfig(format='%(asctime)s [PID {}] %(message)s'.format(self.hostname),
             level = logging.INFO)
 
