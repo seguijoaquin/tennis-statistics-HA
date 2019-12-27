@@ -94,6 +94,16 @@ Esto se puede ver diagramado en la Figura 1.
 
 ![Diagrama simplificado de la arquitectura.](diagramas/architecture.png)
 
+En el diagrama de robustez (Figura 2) se puede observar que los procesos involucrados en la lógica del
+procesamiento de los datos tiene una relación directa con el DAG mostrado en la vista lógica.
+Además cada uno de los procesos tiene comunicación con el proceso _watchdog_ para que éste pueda detectar
+las caídas de los procesos.
+En el caso de los procesos que pertenecen a nodos _stateful_, también tienen comunicación con los procesos de _storage_,
+específicamente con el _master_ y este con los _slaves_.
+
+![Diagrama de robustez.](diagramas/robustez.png)
+
+
 ### Hipótesis y Restricciones
 
 Se tomaron las siguientes hipótesis durante el diseño:
@@ -117,7 +127,7 @@ Dicha instrucción podrá o no indicar un período de tiempo consecutivo haciend
 que el análisis de la información sea únicamente dentro de ese período establecido
 por el cliente. En caso de no hacerlo en forma explícita, se analizarán toda la
 información, independientemente del período dentro del cuál se encuentre.
-De esta forma, el diagrama de casos de uso del sistema se puede ver en la Figura 2.
+De esta forma, el diagrama de casos de uso del sistema se puede ver en la Figura 3.
 
 ![Diagrama de casos de usos.](diagramas/use_cases.png)
 
@@ -159,13 +169,13 @@ líneas filtradas, se divide el procesamiento en 3 ramas:
 2. Partidos en los que el ganador tenía al menos 20 años más que el perdedor.
 3. Cálculo del promedio de la duración en minutos de los partidos en cada superficie.
 
-Esto se puede ver representado en la Figura 3.
+Esto se puede ver representado en la Figura 4.
 
 ![DAG de la lógica de procesamiento.](diagramas/DAG.png)
 
 ## Vista de desarrollo
 
-En el diagrama de paquetes (Figura 4) podemos ver cómo está organizado el sistema.
+En el diagrama de paquetes (Figura 5) podemos ver cómo está organizado el sistema.
 Fundamentalmente, todos los paquetes se conectan con el _middleware_.  Vemos
 que los paquetes incluyen los distintos tipos de nodos de lógica de
 negocio (`accumulator`, `age_calculator`, `average_calculator`,
@@ -207,7 +217,7 @@ Por cada línea procesada para cada ejecución, se concatena este *ID* del clien
 a la información a calcular (junto con el intervalo de fechas). De esta forma,
 la información sigue su camino sin mezclarse entre consultas.
 Una vez lanzada la consulta, cada cliente queda esperando la respuesta en una cola
-cuyo nombre contiene ese *ID* único. En la Figura 5 se puede ver este esquema.
+cuyo nombre contiene ese *ID* único. En la Figura 6 se puede ver este esquema.
 
 ![Diagrama de actividades del esquema de multiprocesamiento.](diagramas/activities_multiprocessing.png)
 
@@ -215,7 +225,7 @@ cuyo nombre contiene ese *ID* único. En la Figura 5 se puede ver este esquema.
 
 Para tolerancia a fallos utilizamos un proceso llamado __Watchdog__ que recibe
 los _heartbeats_ de los demás procesos, y al detectar que uno se cayó los levanta
-con la lógica ilustrada en la Figura 6.
+con la lógica ilustrada en la Figura 7.
 
 ![Diagrama de actividades para levantar a un nodo.](diagramas/watchdog_spawner.png)
 
@@ -277,7 +287,7 @@ _heartbeats_. Un proceso al levantarse consume de esta cola, y sólo comienza
 una nueva elección cuando detecte un _timeout_. Esto implica que si ya había un
 líder entonces no comience una nueva elección mientras viva y que si no había uno
 (por inicio del sistema, por ejemplo) se comience una nueva elección. El diagrama
-de estado se puede ver en la Figura 7.
+de estado se puede ver en la Figura 8.
 
 
 ![Diagrama de estado del algoritmo de elección de líder.](diagramas/bully.png)
@@ -308,7 +318,7 @@ particionados por _job_ y por identificador del nodo, no tenemos productores
 que concurrentemente escriben un mismo dato; además, si asumimos que no
 se desincroniza el reloj del productor (restricción suave), este esquema no falla.
 
-Finalmente, el esquema de replicación de información es sencillo (Figura 8).
+Finalmente, el esquema de replicación de información es sencillo (Figura 9).
 
 
 ![Diagrama de replicación de información en el Storage.](diagramas/replicar_info.png)
@@ -332,7 +342,7 @@ el nuevo maestro puede recibir la misma escritura. Por la misma
 razón que antes, esto no es problema.
 
 Se puede ver el diagrama que ilustra la
-generación de un nuevo nodo maestro en la Figura 9.
+generación de un nuevo nodo maestro en la Figura 10.
 
 ![Diagrama de elección de nuevo _master_ del Storage.](diagramas/nuevo_master.png)
 
@@ -340,7 +350,7 @@ generación de un nuevo nodo maestro en la Figura 9.
 
 ## Vista física
 
-En el diagrama de despliegue (Figura 10) podemos ver un estado correcto del _deployment_
+En el diagrama de despliegue (Figura 11) podemos ver un estado correcto del _deployment_
 de la aplicación. Marcamos en el diagrama la diferencia entre los roles que se
 cumplen en tiempo ejecución, como los nodos _followers_ y _leaders_, o _master_ y
 _slaves_. Inicialmente todos los procesos arrancan como _followers_ o _slaves_. Después
@@ -351,23 +361,12 @@ A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
 ![Diagrama de despliegue. En este caso, DAG Node representa a todos los nodos lógicos mencionados en el DAG, con las mismas multiplicidades.](diagramas/despliegue.png)
 
-En el diagrama de robustez (Figura 11) se puede observar que los procesos involucrados en la lógica del
-procesamiento de los datos tiene una relación directa con el DAG mostrado en la vista lógica.
-Además cada uno de los procesos tiene comunicación con el proceso _watchdog_ para que éste pueda detectar
-las caídas de los procesos.
-En el caso de los procesos que pertenecen a nodos _stateful_, también tienen comunicación con los procesos de _storage_,
-específicamente con el _master_ y este con los _slaves_.
-
-![Diagrama de robustez.](diagramas/robustez.png)
-
-
 ## Conclusiones
 
 En el presente trabajo práctico desarrollamos un sistema distribuido de procesamiento
 en forma de _pipeline_ con tolerancia a fallos. Utilizamos conceptos de
 _message oriented middlewares_, arquitecturas distribuídas, patrones de diseño
 y algoritmos de consenso.
-
 
 ## Referencias
 
