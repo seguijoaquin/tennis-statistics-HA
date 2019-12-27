@@ -69,6 +69,28 @@ unidades de cálculo ligadas al negocio, más otros procesos de soporte. En este
 informe detallamos las decisiones detrás del diseño, documentamos la implementación
 y marcamos puntos de mejora.
 
+## Arquitectura general
+
+La arquitectura general del sistema se divide en tres partes principales:
+
+1. *DAG* en el que se encuentra toda la lógica del procesamiento en _pipeline_
+de los datos para obtener la respuesta. Los nodos de dicho _pipeline_ pueden ser
+_stateful_ o _stateless_. En el caso ideal sin fallas, únicamente sería necesario
+esta componente en la arquitectura dado que la lógica no cambia. En la sección de
+vista lógica se explica con más detalle la división del procesamiento.
+2. *Storage* en el que se guardan los diferentes estados de los nodos que sean
+_stateful_, es decir, que poseen estado y deben recuperarlo al momento de una caída.
+El storage se compone de un proceso _master_ y varios _slaves_ para replicar los datos
+que se persisten. En caso de la caída del _master_, el *Watchdog* elige uno nuevo entre
+los _slaves_.
+3. *Watchdog* que es la parte de la arquitectura que provee tolerancia a fallos
+(junto con el storage) y cuyo propósito es detectar cuándo un nodo se cae y debe
+levantar uno nuevo para poder seguir con el procesamiento. En esta parte hay un proceso
+líder y varios followers, siendo el líder el que se encarga de la detección. En caso
+de que el líder muera, se utiliza un algoritmo de elección de líder para elegir uno nuevo.
+
+![](diagramas/architecture.png)
+
 ## Escenarios
 
 ### Casos de Uso
@@ -88,7 +110,7 @@ De esta forma, el diagrama de casos de uso del sistema sería el siguiente:
 
 ## Vista lógica
 
-El DAG de este trabajo práctico es casi el mismo que el DAG del trabajo práctico 2
+El DAG de este trabajo práctico es similar al DAG del trabajo práctico 2
 con la diferencia de que se agrega la etapa de filtrado del intervalo de fechas
 en el que el cliente quiere que se haga el análisis. Por esta razón el cliente
 le envía las líneas de los archivos al nuevo filtro y a partir de ahí, con las
@@ -136,9 +158,9 @@ _watchdog_.
 
 ### Esquema de multiprocesamiento
 
-Para poder implementar un esquema de multiprocesamiento se optó por identificar 
-a cada cliente que ejecuta una consulta con un *ID* único. Este *ID* es
-provisto por el cliente y representa una consulta de un cliente en particular, 
+Para poder implementar un esquema de multiprocesamiento se optó por identificar
+a cada cliente que ejecuta una consulta con un *ID* único. Este *ID* es un *UUID*
+generado por el programa cliente que representa una consulta de un cliente en particular,
 y el mismo se va propagando por todo el pipeline de ejecución.
 Por cada línea procesada para cada ejecución, se concatena este *ID* del cliente
 a la información a calcular (junto con el intervalo de fechas). De esta forma,
@@ -279,7 +301,7 @@ A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
 Se tomaron las siguientes hipótesis durante el diseño:
 
- - Siempre que el *Watchdog* quiere matar a una instancia, puede matarla. 
+ - Siempre que el *Watchdog* quiere matar a una instancia, puede matarla.
  - No existen particiones en la red.
  - Los *ID* son generados por cada cliente. No existen dos *ID* iguales.
  - Eventualmente una instancia de un filtro se puede levantar y/o las colas tienen tamaño infinito de buffer.
