@@ -2,6 +2,7 @@
 
 import logging, sys, getopt
 from glob import glob
+from uuid import uuid1
 from constants import END, RESPONSE_EXCHANGE, MATCHES_EXCHANGE
 from rabbitmq_queue import RabbitMQQueue
 
@@ -11,31 +12,26 @@ TO_DEFAULT = '20200101'
 
 class Client:
     def __init__(self, argv):
-        self.metadata = [FROM_DEFAULT, TO_DEFAULT, None]
+        self.id = str(uuid1())
+        self.metadata = [FROM_DEFAULT, TO_DEFAULT, self.id]
         self.parse_args(argv)
         self.results = 0
-        self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + self.metadata[2],
+        self.in_queue = RabbitMQQueue(exchange=RESPONSE_EXCHANGE + ':' + self.id,
                                       consumer=True, exclusive=True)
         self.matches_queue = RabbitMQQueue(exchange=MATCHES_EXCHANGE)
 
     def parse_args(self, argv):
         try:
-            options, args = getopt.getopt(argv,"u:f:t:",["user=", "from=", "to="])
+            options, args = getopt.getopt(argv,"f:t:",["from=", "to="])
         except getopt.GetoptError:
-            print("Usage: python3 client.py --user=id [--from=YYYYMMDD] [--to=YYYYMMDD]")
+            print("Usage: python3 client.py [--from=YYYYMMDD] [--to=YYYYMMDD]")
             sys.exit(2)
 
         for option, arg in options:
-            if option in ("-u", "--user"):
-                self.metadata[2] = arg
-            elif option in ("-f", "--from"):
+            if option in ("-f", "--from"):
                 self.metadata[0] = arg
             else:
                 self.metadata[1] = arg
-
-        if self.metadata[2] is None:
-            print("Usage: python3 client.py --user=id [--from=YYYYMMDD] [--to=YYYYMMDD]")
-            sys.exit(2)
 
     def run(self):
         self.send_matches_data()
@@ -50,7 +46,7 @@ class Client:
                     self.matches_queue.publish(body)
                     logging.info('Sent %s' % body)
 
-        end = ','.join([self.metadata[2], END])
+        end = ','.join([self.id, END])
         self.matches_queue.publish(end)
         logging.info('Sent %s' % end)
 
