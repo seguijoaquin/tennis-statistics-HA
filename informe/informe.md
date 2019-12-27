@@ -89,7 +89,21 @@ levantar uno nuevo para poder seguir con el procesamiento. En esta parte hay un 
 líder y varios followers, siendo el líder el que se encarga de la detección. En caso
 de que el líder muera, se utiliza un algoritmo de elección de líder para elegir uno nuevo.
 
-![](diagramas/architecture.png)
+Esto se puede ver diagramado en la Figura 1.
+
+
+![Diagrama simplificado de la arquitectura.](diagramas/architecture.png)
+
+### Hipótesis y Restricciones
+
+Se tomaron las siguientes hipótesis durante el diseño:
+
+ - Siempre que el *Watchdog* quiere matar a una instancia, puede matarla.
+ - No existen particiones en la red.
+ - Los *ID* son generados por cada cliente. No existen dos *ID* iguales.
+ - Eventualmente una instancia de un filtro se puede levantar y/o las colas tienen tamaño infinito de buffer.
+ - Todo nodo de *Storage* puede ser iniciado. No hay fallas de hardware de discos en ningún nodo de *Storage*.
+
 
 ## Escenarios
 
@@ -103,10 +117,35 @@ Dicha instrucción podrá o no indicar un período de tiempo consecutivo haciend
 que el análisis de la información sea únicamente dentro de ese período establecido
 por el cliente. En caso de no hacerlo en forma explícita, se analizarán toda la
 información, independientemente del período dentro del cuál se encuentre.
-De esta forma, el diagrama de casos de uso del sistema sería el siguiente:
+De esta forma, el diagrama de casos de uso del sistema se puede ver en la Figura 2.
 
-![](diagramas/use_cases.png)
+![Diagrama de casos de usos.](diagramas/use_cases.png)
 
+### Criterios de aceptación
+
+Dado el único caso de uso, podemos armar los siguientes criterios de aceptación
+que integran los requerimientos no funcionales.
+
+ - Camino feliz
+    - Levantar el sistema con docker compose
+    - Demostrar que un job lanzado se ejecuta y se obtiene el resultado esperado
+ - Camino feliz con multiple jobs
+    - Al menos dos jobs corriendo en paralelo
+    - Las respuestas a cada job dan el resultado esperado
+    - El sistema sigue prendido
+ - Prueba de carga
+    - Un job sólo utilizando un archivo de > 200 Mb
+    - Se debería ver si hay un cuello de botella revisando CPU consumido por los containers, colas de rabbit.
+ - Mejorar el caso anterior escalando la variable detectada como cuello de botella
+    - Con el sistema idle, se tira el Watchdog y se cambia el líder
+    - Es necesario saber quién es el líder, que se murió el líder, etc
+    - Es necesario mostrar la secuencia de mensajes entre los participantes para ver coherencia en leader election
+ - Dejamos corriendo la prueba de >200 Mb
+    - Se tira un líder, se degrada el sistema
+    - Se incorpora el sistema y sigue procesando
+    - Se obtiene el mismo resultado
+ - Se mata uno de los followers
+    - Necesitamos ver que al levantarse, se pueda hacer catch up
 
 ## Vista lógica
 
@@ -120,11 +159,13 @@ líneas filtradas, se divide el procesamiento en 3 ramas:
 2. Partidos en los que el ganador tenía al menos 20 años más que el perdedor.
 3. Cálculo del promedio de la duración en minutos de los partidos en cada superficie.
 
-![](diagramas/DAG.png)
+Esto se puede ver representado en la Figura 3.
+
+![DAG de la lógica de procesamiento.](diagramas/DAG.png)
 
 ## Vista de desarrollo
 
-En el siguiente diagrama de paquetes podemos ver cómo está organizado el sistema.
+En el diagrama de paquetes (Figura 4) podemos ver cómo está organizado el sistema.
 Fundamentalmente, todos los paquetes se conectan con el _middleware_.  Vemos
 que los paquetes incluyen los distintos tipos de nodos de lógica de
 negocio (`accumulator`, `age_calculator`, `average_calculator`,
@@ -142,7 +183,7 @@ que no han emitido uno en un tiempo dado.
 la persistencia de los datos ante fallas del sistema.
 
 
-![](diagramas/paquetes.png)
+![Diagrama de paquetes.](diagramas/paquetes.png)
 
 Además,
 todos los nodos incluyen al _heartbeat_, excepto el cliente. La lógica es la siguiente:
@@ -166,17 +207,17 @@ Por cada línea procesada para cada ejecución, se concatena este *ID* del clien
 a la información a calcular (junto con el intervalo de fechas). De esta forma,
 la información sigue su camino sin mezclarse entre consultas.
 Una vez lanzada la consulta, cada cliente queda esperando la respuesta en una cola
-cuyo nombre contiene ese *ID* único.
+cuyo nombre contiene ese *ID* único. En la Figura 5 se puede ver este esquema.
 
-![](diagramas/activities_multiprocessing.png)
+![Diagrama de actividades del esquema de multiprocesamiento.](diagramas/activities_multiprocessing.png)
 
 ### Tolerancia a fallos
 
 Para tolerancia a fallos utilizamos un proceso llamado __Watchdog__ que recibe
 los _heartbeats_ de los demás procesos, y al detectar que uno se cayó los levanta
-con la siguiente lógica:
+con la lógica ilustrada en la Figura 6.
 
-\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ ![](diagramas/watchdog_spawner.png) \
+![Diagrama de actividades para levantar a un nodo.](diagramas/watchdog_spawner.png)
 
 El __Watchdog__ tiene un hilo donde periódicamente revisa el estado de los nodos,
 es decir, el tiempo desde el último _heartbeat_. Si alguno pasa el límite se
@@ -197,20 +238,29 @@ Además, el líder manda sus propios _heartbeats_ al resto de los _followers_, d
 de que éstos también puedan saber si se muere. En ese caso, se elige
 un nuevo líder a través del algoritmo Bully.
 
-Al algoritmo Bully detallado en Coulouris (2005) le hicimos ciertas modificaciones
-y extensiones. Como mencionamos antes, como mecanismo de detección de caída del líder
+### Elección de líder
+
+El algoritmo Bully detallado en Coulouris (2005) fue modificado y extendido.
+Como fuera mencionado antes, como mecanismo de detección de caída del líder
 utilizamos una _exchange_ de tipo _fanout_ donde cada proceso
 puede consumir los _heartbeats_ del líder. Un detalle que no se menciona en
 el libro es el tamaño del _timeout_ de esperar un mensaje del tipo `COORDINATOR`.
 Para relacionarlo a la longitud del timeout del mensaje `ANSWER`($T_1$) podemos
 pensar en el siguiente esquema. Si tenemos tres procesos, $p_1$, $p_2$ y $p_3$,
 $p_1$ le enviará `ELECTION` a $p_2$ y $p_3$. Supongamos además que $p_3$ está
-caído. $p_2$ responde `ANSWER` a $p_2$ y envía `ELECTION` a $p_3$, esperando
-hasta $p_2$ hasta el _timeout_ y $p_1$ hasta otro también. Al transcurrir $T_1$
+caído. $p_2$ responde `ANSWER` a $p_1$ y envía `ELECTION` a $p_3$, esperando
+$p_2$ hasta el _timeout_ y $p_1$ hasta otro también. Al transcurrir $T_1$
 se da cuenta $p_2$ que $p_3$ no está activo, entonces debe pasar a ser el líder.
 Como $T_1 = 2*T_{transmision} + T_{procesamiento}$, llegamos a que el _timeout_
-del mensaje `COORDINATOR` tiene como cota mínima $2T_1$. Si es menor, hay riesgo
-de que $p_1$ quiera comenzar otra elección antes de terminar la actual.
+del mensaje `COORDINATOR` tiene como cota mínima $2T_1$. Es decir, $p_2$ tarda
+$T_1$ en darse cuenta que debe ser líder y en procesar y transmitir esa información
+puede tardar nuevamente hasta $T_1$. Si es menor, hay riesgo
+de que $p_1$ quiera comenzar otra elección antes de terminar la actual. Observamos
+que si hay $N$ nodos esto no afecta al algoritmo, pues $p_1$ le avisó a todos los
+superiores que había una elección. No son necesarios varios ``hops'' para comunicar
+la información: este esquema se generaliza considerando a $p_2$ como el proceso _vivo_
+máximo -- el comportamiento de los otros procesos no es relevante a este problema
+en particular.
 
 En la implementación era necesario especificar qué comportamiento tenía el
 sistema al incorporarse un nodo nuevo (re-incorporarse, en realidad). Una
@@ -221,12 +271,16 @@ con identificadores inferiores no se darán cuenta de que ha comenzado una elecc
 Si además el proceso levantado tiene identificador máximo, ejecutará la
 elección solo y se definirá como líder. Si bien es posible que los otros acepten
 al nuevo líder al recibir su mensaje `COORDINATOR`, también implica que por breves
-momentos hay dos líderes y eso no es aceptable. La solución, no aclarada
-en Coulouris (2005), es que todos los procesos inicien siguiendo al líder,
-escuchando sus _heartbeats_.
+momentos hay dos líderes y eso no es aceptable. Por esto, la solución que implementamos
+nosotros aprovecha el uso de la cola particular donde el líder publica sus
+_heartbeats_. Un proceso al levantarse consume de esta cola, y sólo comienza
+una nueva elección cuando detecte un _timeout_. Esto implica que si ya había un
+líder entonces no comience una nueva elección mientras viva y que si no había uno
+(por inicio del sistema, por ejemplo) se comience una nueva elección. El diagrama
+de estado se puede ver en la Figura 7.
 
 
-\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \  ![](diagramas/bully.png) \
+![Diagrama de estado del algoritmo de elección de líder.](diagramas/bully.png)
 
 Una observación adicional. Los _followers_ no reciben información adicional
 del líder ni procesan los _heartbeats_. Sólo al hacer la transición a líder
@@ -241,8 +295,8 @@ proceso.
 
 Anteriormente desarrollamos la idea un almacenamiento con un maestro y varios
 esclavos. Asimismo, los nodos que integran el _storage_ se abstraen de decidir
-quién será el maestro. Establecido eso, ahora describiremos cómo se replica la
-información en el sistema. El comportamiento se basa en las colas durables
+quién será el maestro. Establecido eso, la información en el sistema
+se replica de la siguiente manera. El comportamiento se basa en las colas durables
 de RabbitMQ: una vez que el maestro recibe una escritura, la replica
 en un _exchange_ de tipo _fanout_. No es necesario esperar a un `ACK` de las
 réplicas, porque Rabbit nos está garantizando la entrega. Aunque un nodo
@@ -254,10 +308,10 @@ particionados por _job_ y por identificador del nodo, no tenemos productores
 que concurrentemente escriben un mismo dato; además, si asumimos que no
 se desincroniza el reloj del productor (restricción suave), este esquema no falla.
 
-Finalmente, el esquema de replicación de información es sencillo.
+Finalmente, el esquema de replicación de información es sencillo (Figura 8).
 
 
-![](diagramas/replicar_info.png)
+![Diagrama de replicación de información en el Storage.](diagramas/replicar_info.png)
 
 
 Como el _master_ puede caerse, es necesario que otro nodo asuma el rol.
@@ -277,16 +331,16 @@ el punto de vista del nodo maestro, si se cae antes de dar el `ACK`
 el nuevo maestro puede recibir la misma escritura. Por la misma
 razón que antes, esto no es problema.
 
-A continuación se puede ver el diagrama que ilustra la
-generación de un nuevo nodo maestro.
+Se puede ver el diagrama que ilustra la
+generación de un nuevo nodo maestro en la Figura 9.
 
-![](diagramas/nuevo_master.png)
+![Diagrama de elección de nuevo _master_ del Storage.](diagramas/nuevo_master.png)
 
 
 
 ## Vista física
 
-En el siguiente diagrama de despliegue podemos ver un estado correcto del _deployment_
+En el diagrama de despliegue (Figura 10) podemos ver un estado correcto del _deployment_
 de la aplicación. Marcamos en el diagrama la diferencia entre los roles que se
 cumplen en tiempo ejecución, como los nodos _followers_ y _leaders_, o _master_ y
 _slaves_. Inicialmente todos los procesos arrancan como _followers_ o _slaves_. Después
@@ -295,44 +349,15 @@ es el _storage master_.
 
 A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
-![](diagramas/despliegue.png)
+![Diagrama de despliegue. En este caso, DAG Node representa a todos los nodos lógicos mencionados en el DAG, con las mismas multiplicidades.](diagramas/despliegue.png)
 
-## Hipótesis y Restricciones
-
-Se tomaron las siguientes hipótesis durante el diseño:
-
- - Siempre que el *Watchdog* quiere matar a una instancia, puede matarla.
- - No existen particiones en la red.
- - Los *ID* son generados por cada cliente. No existen dos *ID* iguales.
- - Eventualmente una instancia de un filtro se puede levantar y/o las colas tienen tamaño infinito de buffer.
- - Todo nodo de *Storage* puede ser iniciado. No hay fallas de hardware de discos en ningún nodo de *Storage*.
-
- ## Criterios de aceptación
-
- Los criterios de aceptación acordados son los siguientes:
- - Camino feliz
-    - Levantar el sistema con docker compose
-    - Demostrar que un job lanzado se ejecuta y se obtiene el resultado esperado
- - Camino feliz con multiple jobs
-    - Al menos dos jobs corriendo en paralelo
-    - Las respuestas a cada job dan el resultado esperado
-    - El sistema sigue prendido
- - Prueba de carga
-    - Un job sólo utilizando un archivo de > 200 Mb
-    - Se debería ver si hay un cuello de botella revisando CPU consumido por los containers, colas de rabbit.
- - Mejorar el caso anterior escalando la variable detectada como cuello de botella
-    - Con el sistema idle, se tira el Watchdog y se cambia el líder
-    - Es necesario saber quién es el líder, que se murió el líder, etc
-    - Es necesario mostrar la secuencia de mensajes entre los participantes para ver coherencia en leader election
- - Dejamos corriendo la prueba de >200 Mb
-    - Se tira un líder, se degrada el sistema
-    - Se incorpora el sistema y sigue procesando
-    - Se obtiene el mismo resultado
- - Se mata uno de los followers
-    - Necesitamos ver que al levantarse, se pueda hacer catch up
 
 ## Conclusiones
 
+En el presente trabajo práctico desarrollamos un sistema distribuido de procesamiento
+en forma de _pipeline_ con tolerancia a fallos. Utilizamos conceptos de
+_message oriented middlewares_, arquitecturas distribuídas, patrones de diseño
+y algoritmos de consenso.
 
 
 ## Referencias
