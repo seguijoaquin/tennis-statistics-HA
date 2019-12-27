@@ -18,20 +18,17 @@ class Storage:
     def __init__(self, pid):
         self.pid = pid
         self.role = SLAVE_ROLE
-        self.slaves = RabbitMQQueue(exchange='storage_slave')
-        self.input_queue = RabbitMQQueue(exchange='storage_slave', consumer=True, exclusive=False, queue_name='slave{}_queue'.format(pid))
-        self.output_queue = RabbitMQQueue(exchange = 'storage_output')
-        self.master_queue = RabbitMQQueue(exchange = 'storage_input', consumer = True, queue_name = 'master_queue')
-        self.instance_subscriber = RabbitMQQueue(exchange='storage_internal_{}'.format(pid), consumer=True, exclusive=False, queue_name='storage_internal_{}'.format(pid))
-        self.instance_publisher = RabbitMQQueue(exchange='storage_internal_{}'.format(pid))
+        self.input_queue = RabbitMQQueue(exchange='storage_slave', consumer=True, queue_name='slave{}_queue'.format(pid))
+        self.output_queue = RabbitMQQueue(exchange='storage_output', exchange_type='direct')
+        self.master_queue = RabbitMQQueue(exchange='storage_input', consumer=True, queue_name='master_queue')
+        self.instance_queue = RabbitMQQueue(exchange='storage_internal_{}'.format(pid), consumer=True, queue_name='storage_internal_{}'.format(pid))
         self.heartbeatproc = None
 
     def run(self, heartbeatproc):
         self.heartbeatproc = heartbeatproc
         self.heartbeatproc.metadata = self.role
         self.input_queue.consume(self.process)
-        self.instance_subscriber.consume(self.listen)
-
+        self.instance_queue.consume(self.listen)
 
     def process(self, ch, method, properties, body):
         if self.role == SLAVE_ROLE:
@@ -47,7 +44,7 @@ class Storage:
                     # start sending new role in heartbeats
                     self.heartbeatproc.metadata = self.role
                     ch.basic_ack(delivery_tag=method.delivery_tag)
-                    self.instance_publisher.publish(MASTER_NEEDED_MSG)
+                    self.instance_queue.publish(MASTER_NEEDED_MSG)
                     self.input_queue.cancel()
                 else:
                     logging.info('[SLAVE] I received a master message but I was not the target')
@@ -69,22 +66,21 @@ class Storage:
             self.processRead(body)
         if self.isWriteRequest(body):
             self.persistState(body)
-            self.slaves.publish(body)
+            self.input_queue.publish(body)
         if ch.is_open:
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def persistState(self, body):
         state = body.decode()
         logging.info('Persisting to disk {%r}' % state)
-        # MSG = CMD;tipoNodo_nroNodo;estado;ids_vistos;timestamp;job_id
-        # EJ: WRITE;joiner_3;93243;10,11,12,13;20191206113249;123123
+        # MSG = CMD;tipoNodo_nroNodo;estado;job_id
+        # EJ: WRITE;joiner_3;93243;123123
         params = state.split(';')
-        storageShard = self.getStorageShard(params[5]) # Shard storage data by job_id into 2 clusters
-        # path = "/storage/shard_id/nodeType_nodeNumber/"
-        path = BASE_PATH + str(storageShard) + "/" + str(params[1]) + "/"
+        # path = "/storage/nodeType_nodeNumber/"
+        path = BASE_PATH + params[1] + "/"
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
         # filename = "job_id"
-        filename = str(params[5]) + ".state"
+        filename = params[-1] + ".state"
         f = open(path + filename, "w+") # Truncates previous state & writes
         f.write(str(state))
         f.close()
@@ -101,23 +97,18 @@ class Storage:
         return False
 
     def processRead(self, msg):
-        # MSG = CMD;tipoNodo_nroNodo;timestamp
-        # EJ: READ;joiner_3;20191201312312
+        # MSG = CMD;tipoNodo_nroNodo
+        # EJ: READ;joiner_3
         params = msg.decode().split(';')
-        storageShard = self.getStorageShard(params[3])
-        filename = params[1]
-        filePath = BASE_PATH + str(storageShard) + "/" +str(filename) + "/"
+        path = BASE_PATH + params[1] + "/"
+        client_routing_key = params[1]
 
-        for file in glob(filePath + "*.state"):
+        for filename in glob(path + "*.state"):
             with open(filename, 'r') as file:
                 contents = file.read()
-                client_routing_key = str(filename)
                 self.output_queue.publish(contents, client_routing_key)
 
         self.output_queue.publish('END', client_routing_key)
-
-    def getStorageShard(self, id):
-        return int(id) % 2
 
 if __name__ == '__main__':
     from watchdog import heartbeatprocess
