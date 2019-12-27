@@ -351,6 +351,15 @@ A diferencia del TP2 también vemos que se aceptan múltiples clientes.
 
 ![Diagrama de despliegue. En este caso, DAG Node representa a todos los nodos lógicos mencionados en el DAG, con las mismas multiplicidades.](diagramas/despliegue.png)
 
+En el diagrama de robustez (Figura 11) se puede observar que los procesos involucrados en la lógica del
+procesamiento de los datos tiene una relación directa con el DAG mostrado en la vista lógica.
+Además cada uno de los procesos tiene comunicación con el proceso _watchdog_ para que éste pueda detectar
+las caídas de los procesos.
+En el caso de los procesos que pertenecen a nodos _stateful_, también tienen comunicación con los procesos de _storage_,
+específicamente con el _master_ y este con los _slaves_.
+
+![Diagrama de robustez.](diagramas/robustez.png)
+
 
 ## Conclusiones
 
