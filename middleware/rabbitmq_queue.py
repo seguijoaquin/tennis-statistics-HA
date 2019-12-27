@@ -7,7 +7,7 @@ import logging
 HOST = 'rabbitmq'
 
 class RabbitMQQueue:
-    def __init__(self, exchange, exchange_type='fanout', consumer=False, exclusive=False, queue_name='', routing_keys=[None]):
+    def __init__(self, exchange, exchange_type='fanout', consumer=False, exclusive=False, queue_name='', routing_keys=[None], durable=True):
         self.thread_stop = True
         self.thread = None
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=HOST, heartbeat=0))
@@ -18,7 +18,7 @@ class RabbitMQQueue:
         if not consumer:
             return
 
-        result = self.channel.queue_declare(queue=queue_name, durable=True, exclusive=exclusive)
+        result = self.channel.queue_declare(queue=queue_name, durable=durable, exclusive=exclusive)
         self.queue_name = result.method.queue
         for routing_key in routing_keys:
             self.channel.queue_bind(exchange=exchange, queue=self.queue_name, routing_key=routing_key)

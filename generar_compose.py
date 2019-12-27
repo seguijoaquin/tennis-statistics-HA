@@ -337,6 +337,22 @@ templates = {
     depends_on:
       rabbitmq:
         condition: service_healthy
+""",
+    "storage":"""
+  storage_{0}:
+    build:
+      context: .
+      dockerfile: storage/Dockerfile
+    command: python3 -u ./storage.py
+    environment:
+      HOSTNAME: storage_{0}
+      PID: {0}
+      BASEDIRNAME: {basedirname}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 """
 }
 header = """

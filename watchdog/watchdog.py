@@ -10,9 +10,14 @@ EXCHANGE = "watchdogx"
 CHECK_INTERVAL = 1
 HEARTBEAT_TIMEOUT = 1.2
 STOP_SLEEP = 5 # time to wait after stopping a container
-START_SLEEP = 5 # time to wait after starting a container to check
+START_SLEEP = 5 # max time to wait after starting a container to check
 STARTING_TOLERANCE = 10 # tolerance for the first timeout
+POLL_INTERVAL = 1 # docker polling interval
 CLUSTER_CONFIG_YML = "cluster_config.yml"
+MAXFAILED = 3 # max times to reattempt an operation (e.g. docker cmd)
+MASTER_ROLE = "master"
+SLAVE_ROLE = "slave"
+NEW_MASTER_MSG = "M"
 
 def load_yaml():
     import yaml
@@ -30,6 +35,9 @@ class WatchdogProcess:
     def __init__(self, hostname):
         self.hostname = hostname
         self.basedirname  = os.getenv("BASEDIRNAME", "error")
+        self.to_start = []
+        self.to_stop = []
+        self.reassigning = False
         self.load_default_config()
 
     def run(self):
@@ -38,17 +46,21 @@ class WatchdogProcess:
         self.setup_queues()
         logging.info("Launching receiver thread")
         self.launch_receiver_thread()
+        logging.info("Launching spawner threads")
+        self.launch_spawner_threads()
         logging.info("Launching checker")
         self.launch_checker()
 
     def setup_queues(self):
         self.leader_queue = RabbitMQQueue(
-            exchange=EXCHANGE, consumer=True)
+            exchange=EXCHANGE, consumer=True, durable=False)
+        self.storage_exchange = RabbitMQQueue(exchange='storage_slave', consumer=False)
 
     def load_default_config(self):
         self.default_config = load_yaml()
 
         self.last_timeout = {}
+        self.storage_roles = {}
         for key in self.default_config.keys():
             if key == "client":
                 continue
@@ -56,11 +68,13 @@ class WatchdogProcess:
                 "{}_{}".format(key,i):time.time()+STARTING_TOLERANCE
                 for i in range(self.default_config[key])}
             self.last_timeout.update(structure_single_key)
-        #del self.last_timeout[self.hostname]
+            if key == "storage": # TODO
+                self.storage_roles.update({k: SLAVE_ROLE for k in structure_single_key.keys()})
+
+        self.storage_master_heartbeat = 0 # instant timeout
         # Special structure to indicate that a container is being restarted and
         # should not be checked for timeouts.
         self.respawning = {k: False for k in self.last_timeout.keys()}
-        # TODO: special case for storage (master & replicas)
 
     def process_heartbeat(self, ch, method, properties, body):
         logging.debug("Received heartbeat message is {}".format(str(body)))
@@ -70,16 +84,32 @@ class WatchdogProcess:
 
         self.last_timeout[recv_hostname] = time.time()
 
-        # TODO: if hostname is compatible with storage then check the metadata
+        if recv_hostname.split("_")[0] == "storage":
+            self.storage_roles[recv_hostname] = recv_metadata
+            if self.storage_roles[recv_hostname] == MASTER_ROLE:
+                self.storage_master_heartbeat = self.last_timeout[recv_hostname]
 
     def mkimgname(self, imgid):
         return "{}_{}_1".format(self.basedirname, imgid)
+
     def stop_container(self, imgid):
         imgid = self.mkimgname(imgid)
+        failed = 0
         result = subprocess.run(['docker', 'stop', "-t" ,"1", imgid],
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logging.info('Stop command executed. Result={}. Output={}. Error={}'.format(
             result.returncode, result.stdout, result.stderr))
+        while result.returncode != 0 and failed < MAXFAILED:
+            failed +=1
+            logging.error("Return code was not zero. Trying again.. ({}/{} attempts)".format(
+                failed, MAXFAILED
+            ))
+            result = subprocess.run(['docker', 'stop', "-t" ,"1", imgid],
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if failed >= MAXFAILED:
+            raise Exception("Surpassed maximum retries for docker stop")
+
 
     def launch_container(self, imgid):
         imgid = self.mkimgname(imgid)
@@ -95,30 +125,114 @@ class WatchdogProcess:
             check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return imgid in str(result.stdout)
 
-    def respawn_container(self, imgid):
-        logging.info("RESPAWN_CONTAINER called({})".format(imgid))
-        self.stop_container(imgid)
-        time.sleep(STOP_SLEEP)
-        self.launch_container(imgid)
-        time.sleep(START_SLEEP)
-        if not self.container_is_running(imgid):
-            logging.warn("Image {} was started but was not found in ps!".format(imgid))
-        self.respawning[imgid] = False
+    def respawn_stop_loop(self):
+        """
+        This thread stops containers listed in self.to_pop
+        and sends them onto the respawn_start_thread via the
+        self.to_start list.
+        """
+        while True:
+            if len(self.to_stop) == 0:
+                time.sleep(POLL_INTERVAL)
+                continue
+            imgid = self.to_stop.pop()
+            try:
+                self.stop_container(imgid)
+                self.to_start.append(imgid)
+            except Exception as e:
+                # If we find an error stopping the container then we unmark
+                #it and hope next time there is no error.
+                logging.error("Exception on respawn_stop_thread: "+str(e))
+                self.respawning[imgid] = False
+
+    def respawn_start_loop(self):
+        """
+        This thread starts containers listed in self.to_start
+        after a START_SLEEP interval and removes the respawning flag.
+        The first heartbeat timeout is set with a STARTING_TOLERANCE
+        offset.
+        """
+        waiting = [] # internal list that we don't have race conditions on
+        while True:
+            current_time = time.time()
+            if len(self.to_start) == 0 and len(waiting) == 0:
+                time.sleep(POLL_INTERVAL)
+                continue
+            if len(self.to_start) > 0:
+                imgid = self.to_start.pop() #atomic
+                waiting.append((imgid, current_time + START_SLEEP))
+            # launch a container if we have passed the scheduled start time
+            for imgid, scheduled_time in waiting:
+                if scheduled_time <= current_time:
+                    try:
+                        self.launch_container(imgid)
+                    except Exception as e:
+                        logging.error("Exception on respawn_start_thread: "+str(e))
+                    finally:
+                        self.last_timeout[imgid] = time.time() + STARTING_TOLERANCE
+                        self.respawning[imgid] = False
+            # filter launched container
+            waiting = [(i,t) for i,t in waiting if current_time<t]
+
+    def launch_spawner_threads(self):
+        respawn_start = threading.Thread(target=self.respawn_stop_loop)
+        respawn_start.start()
+
+        respawn_stop = threading.Thread(target=self.respawn_start_loop)
+        respawn_stop.start()
 
     def launch_receiver_thread(self):
         self.leader_queue.async_consume(self.process_heartbeat, auto_ack=True)
 
+    def reassign_storage_master(self):
+        logging.info("Watchdog Leader: reassigning master")
+        #TODO: what about the first time?all responding but no master => por esto el flag adicional y eso.
+
+        # setear el master como slave y agarrar un nodo vivo
+        logging.info("Storage settings right now: {}".format(self.storage_roles))
+        current_time = time.time()
+        for storage_node in self.storage_roles.keys():
+            self.storage_roles[storage_node] = SLAVE_ROLE
+            if current_time - self.last_timeout[storage_node] < HEARTBEAT_TIMEOUT:
+                new_master = storage_node
+
+        logging.info("Watchdog Leader: new master should be {}, current role is {}".format(
+            new_master, self.storage_roles[new_master]
+        ))
+
+        self.storage_exchange.publish("{},{}".format(
+            NEW_MASTER_MSG,
+            new_master.split("_")[-1] # PID
+        ))
+
+        # wait until node has processed the message and changed roles
+        while self.storage_roles[new_master] == SLAVE_ROLE:
+            logging.info("Watchdog Leader: waiting for {} to change role".format(new_master))
+            time.sleep(POLL_INTERVAL)
+
+        logging.info("Watchdog Leader: {} has changed role to {}, moving away".format(
+            new_master,
+            self.storage_roles[new_master]
+        ))
+        logging.info("Storage settings after reassigning: {}".format(self.storage_roles))
+        self.reassigning = False
     def launch_checker(self):
+        i = 0
         while True:
-            #TODO: special case for storage master & replicas
+            i = (i+1) % 5
             current_time = time.time()
             for hostname, last_heartbeat in self.last_timeout.items():
                 if current_time - last_heartbeat > HEARTBEAT_TIMEOUT and not self.respawning[hostname]:
                     logging.info("Detected timeout of hostname {}".format(hostname))
                     self.respawning[hostname] = True
-                    thread = threading.Thread(target=self.respawn_container, args=(hostname,))
-                    thread.start()
-                    current_time = time.time() #to prevent staleness
+                    self.to_stop.append(hostname) # another thread reads this queue
+
+            if current_time - self.storage_master_heartbeat > HEARTBEAT_TIMEOUT and not self.reassigning:
+                self.reassigning = True
+                reassign_thread = threading.Thread(target=self.reassign_storage_master)
+                reassign_thread.start()
+            if i == 1:
+                logging.info("Storage settings right now: {}".format(self.storage_roles))
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
